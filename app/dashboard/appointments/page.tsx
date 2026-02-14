@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Clock, MapPin, User, CheckCircle } from "lucide-react";
+import { Calendar, Clock, MapPin, Video, CheckCircle } from "lucide-react";
 import { useState } from "react";
 
 const doctors = [
@@ -8,10 +8,11 @@ const doctors = [
         id: 1,
         name: "Dr. Sarah Chen",
         specialty: "General Physician",
-        location: "City Hospital, Block A",
+        location: "Online Meeting",
         time: "10:00 AM - 11:00 AM",
         date: "Today, Feb 14",
         image: "bg-blue-500",
+        type: "online", // Added online type
     },
     {
         id: 2,
@@ -21,6 +22,7 @@ const doctors = [
         time: "02:00 PM - 03:00 PM",
         date: "Tomorrow, Feb 15",
         image: "bg-purple-500",
+        type: "offline",
     },
 ];
 
@@ -76,8 +78,17 @@ export default function AppointmentsPage() {
 
                             {/* Info */}
                             <div className="flex-1 space-y-1">
-                                <h3 className="font-semibold text-lg">{doc.name}</h3>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="font-semibold text-lg">{doc.name}</h3>
+                                    {doc.type === "online" && (
+                                        <span className="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-0.5 rounded-full border border-blue-500/20 uppercase font-medium tracking-wide">
+                                            Video Call
+                                        </span>
+                                    )}
+                                </div>
+
                                 <p className="text-gray-400 text-sm">{doc.specialty}</p>
+
                                 <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
                                     <div className="flex items-center gap-1">
                                         <MapPin size={12} /> {doc.location}
@@ -90,10 +101,17 @@ export default function AppointmentsPage() {
 
                             {/* Status/Action */}
                             <div className="flex items-center gap-3 w-full md:w-auto">
-                                <div className="flex items-center gap-2 px-3 py-1 bg-green-500/10 text-green-400 rounded-full text-xs font-medium border border-green-500/20">
-                                    <CheckCircle size={12} /> Confirmed
-                                </div>
-                                <button className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-white">
+                                {doc.type === "online" ? (
+                                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-500/20">
+                                        <Video size={16} /> Join Google Meet
+                                    </button>
+                                ) : (
+                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-400 rounded-full text-xs font-medium border border-green-500/20">
+                                        <CheckCircle size={12} /> Appointment Confirmed
+                                    </div>
+                                )}
+
+                                <button className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-gray-400">
                                     Reschedule
                                 </button>
                             </div>
