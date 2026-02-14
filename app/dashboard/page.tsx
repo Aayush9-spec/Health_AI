@@ -46,13 +46,13 @@ export default function DashboardHome() {
 
     const toggleListening = () => {
         if (isListening) {
-            recognitionRef.current?.stop();
+            recognitionRef.current?.stop(); // Stop listening
         } else {
-            recognitionRef.current?.start();
+            recognitionRef.current?.start(); // Start listening
         }
     };
 
-    const handleSend = (textOverride?: string) => {
+    const handleSend = async (textOverride?: string) => {
         const text = textOverride || input;
         if (!text.trim()) return;
 
@@ -61,7 +61,45 @@ export default function DashboardHome() {
         setInput("");
         setIsProcessing(true);
 
-        // AI Logic Simulation
+        try {
+            // Step 1: Call the Serverless AI Brain
+            const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })) }),
+            });
+
+            if (!response.ok) throw new Error("Network response was not ok");
+
+            const data = await response.json();
+
+            // Step 2: Handle API Key Missing / Fallback gracefully
+            if (data.content && data.content.includes("medical-intelligence-node-missing")) {
+                // Fallback to local simulation if no key (so the demo still works)
+                runLocalSimulation(text);
+            } else {
+                // Real AI Response
+                // Check for appointment intent in real response (basic keyword check on AI output)
+                let action = undefined;
+                const lowerContent = data.content.toLowerCase();
+                if (lowerContent.includes("book") || lowerContent.includes("schedule")) {
+                    action = "confirm_booking";
+                } else if (lowerContent.includes("consult") || lowerContent.includes("doctor") || lowerContent.includes("specialist")) {
+                    action = "book_appointment";
+                }
+
+                setMessages((prev) => [...prev, { role: "ai", content: data.content, action }]);
+                setIsProcessing(false);
+            }
+
+        } catch (error) {
+            console.error("AI Brain Error:", error);
+            // Fallback on error
+            runLocalSimulation(text);
+        }
+    };
+
+    const runLocalSimulation = (text: string) => {
         setTimeout(() => {
             let aiResponse;
             const lowerText = text.toLowerCase();
@@ -69,19 +107,19 @@ export default function DashboardHome() {
             if (lowerText.includes("fever") || lowerText.includes("headache") || lowerText.includes("cold")) {
                 aiResponse = {
                     role: "ai",
-                    content: "I've analyzed your symptoms. It indicates a potential viral infection. \n\nRecommended Action: Consultation with a General Physician.",
-                    action: "book_appointment", // Custom action trigger
+                    content: "Simulated: I've analyzed your symptoms. It indicates a potential viral infection. \n\n(Add OPENAI_API_KEY to .env.local for Real AI Analysis)",
+                    action: "book_appointment",
                 };
             } else if (lowerText.includes("book") || lowerText.includes("appointment")) {
                 aiResponse = {
                     role: "ai",
-                    content: "I can schedule that for you. Accessing the global schedule mesh...",
+                    content: "Simulated: I can schedule that for you. Accessing the global schedule mesh...",
                     action: "confirm_booking",
                 };
             } else {
                 aiResponse = {
                     role: "ai",
-                    content: "I understand. Could you provide more specific details about your symptoms so I can cross-reference with the medical database?",
+                    content: "Simulated: I understand. Could you provide more specific details? \n\n(This is a local fallback. Add your API Key to enable the real LLM.)",
                 };
             }
 
@@ -134,7 +172,8 @@ export default function DashboardHome() {
                                 <p className="leading-relaxed whitespace-pre-wrap text-sm">{msg.content}</p>
 
                                 {/* AI Action Widgets */}
-                                {msg.action === "book_appointment" && (
+                                {/* Using type assertion or generic property access safely since 'action' might not exist on all messages */}
+                                {(msg as any).action === "book_appointment" && (
                                     <div className="mt-4 p-3 bg-black/40 rounded-lg border border-white/10">
                                         <div className="flexStart flex items-center gap-3 mb-3">
                                             <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
