@@ -131,12 +131,12 @@ export default function DashboardHome() {
     return (
         <div className="h-[calc(100vh-6rem)] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
                     <h1 className="text-2xl font-bold mb-1">Health Assistant</h1>
                     <p className="text-gray-400 text-sm">Voice Command Active • Neural Engine v2.0</p>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex gap-4 self-start sm:self-auto">
                     <div className="px-3 py-1 bg-green-500/10 border border-green-500/20 text-green-400 rounded-full text-xs flex items-center gap-2">
                         <Activity size={12} />
                         System Optimal
@@ -156,8 +156,8 @@ export default function DashboardHome() {
                         >
                             <div
                                 className={`max-w-[85%] rounded-2xl p-4 ${msg.role === "user"
-                                        ? "bg-purple-600/20 text-purple-100 border border-purple-500/30"
-                                        : "bg-white/5 text-gray-200 border border-white/5"
+                                    ? "bg-purple-600/20 text-purple-100 border border-purple-500/30"
+                                    : "bg-white/5 text-gray-200 border border-white/5"
                                     }`}
                             >
                                 {/* AI Label */}
@@ -210,8 +210,8 @@ export default function DashboardHome() {
                         <button
                             onClick={toggleListening}
                             className={`p-3 rounded-full transition-all border ${isListening
-                                    ? "bg-red-500/20 text-red-400 border-red-500/50 animate-pulse"
-                                    : "bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:text-white"
+                                ? "bg-red-500/20 text-red-400 border-red-500/50 animate-pulse"
+                                : "bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:text-white"
                                 }`}
                         >
                             <Mic size={20} />

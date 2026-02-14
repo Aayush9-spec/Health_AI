@@ -96,7 +96,7 @@ export default function Home() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-6xl md:text-8xl font-medium tracking-tight leading-[0.95] mb-8"
+              className="text-4xl sm:text-6xl md:text-8xl font-medium tracking-tight leading-[0.95] mb-8"
             >
               The Medical <br />
               <span className="text-gray-500">Intelligence Layer</span>

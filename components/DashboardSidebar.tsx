@@ -47,12 +47,13 @@ export default function DashboardSidebar() {
                 >
                     <div className="flex flex-col h-full">
                         {/* Logo */}
-                        <div className="h-20 flex items-center px-6 border-b border-white/10">
+                        {/* Logo */}
+                        <Link href="/" className="h-20 flex items-center px-6 border-b border-white/10 hover:bg-white/5 transition-colors">
                             <div className="w-8 h-8 bg-purple-600 rounded-sm flex items-center justify-center mr-3 font-bold text-white">
                                 M
                             </div>
                             <span className="font-bold text-xl text-white tracking-tight">MedAI</span>
-                        </div>
+                        </Link>
 
                         {/* Navigation */}
                         <nav className="flex-1 px-4 py-8 space-y-2">
@@ -64,8 +65,8 @@ export default function DashboardSidebar() {
                                         href={item.href}
                                         onClick={() => setIsOpen(false)}
                                         className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${isActive
-                                                ? "bg-purple-600/10 text-purple-400 border border-purple-600/20"
-                                                : "text-gray-400 hover:text-white hover:bg-white/5"
+                                            ? "bg-purple-600/10 text-purple-400 border border-purple-600/20"
+                                            : "text-gray-400 hover:text-white hover:bg-white/5"
                                             }`}
                                     >
                                         {item.icon}

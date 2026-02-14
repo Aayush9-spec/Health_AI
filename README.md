@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧠 MedAI: Decentralized Medical Intelligence Protocol
 
-## Getting Started
+**MedAI** is an AI-powered healthcare platform that bridges the gap between patient care, artificial intelligence, and decentralized finance. It provides real-time symptom analysis, connects patients with doctors, and facilitates secure, transparent payments via blockchain technology.
 
-First, run the development server:
+![MedAI Dashboard Preview](https://via.placeholder.com/1200x600?text=MedAI+Dashboard+Preview)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🚀 Key Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 1. **AI Health Assistant (The Brain)**
+   *   **Real-time Diagnosis**: Uses **OpenAI GPT-4o** to analyze symptoms and provide preliminary medical advice with disclaimers.
+   *   **Voice Interface**: Natural language voice commands for hands-free interaction.
+   *   **Actionable Insights**: Automatically detects intent (e.g., "Book appointment") and triggers relevant UI flows.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. **Doctor-Patient Marketplace**
+   *   **Patient Dashboard**: Manage appointments, view prescriptions, and track medical history.
+   *   **Provider Portal**: Dedicated interface for doctors to manage patients, join video calls, and digitally sign prescriptions.
+   *   **Video Consultations**: Integrated Google Meet links for seamless telehealth sessions.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. **Web3 & Payments (The Chain)**
+   *   **Smart Wallet**: Built-in crypto wallet support (via **RainbowKit** & **Wagmi**).
+   *   **Secure Transactions**: Pay for consultations and prescriptions using ETH/USDC (Simulated on Testnet).
+   *   **Transparency**: Immutable record of medical transactions.
 
-## Learn More
+### 4. **Enterprise-Grade Security**
+   *   **Authentication**: Secure login/signup via **Supabase Auth**.
+   *   **Role-Based Access**: Specialized views for Patients vs. Doctors.
+   *   **Data Privacy**: HIPAA-compliant data handling practices (Architecture ready).
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🛠 Tech Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+*   **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS.
+*   **AI**: OpenAI API (GPT-4o), Web Speech API.
+*   **Backend / Auth**: Supabase (PostgreSQL, Auth & Row Level Security).
+*   **Web3**: Wagmi, Viem, RainbowKit, Ethereum/Polygon (Testnet).
+*   **Deployment**: Vercel (Frontend), Supabase (Database).
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## ⚡ Getting Started
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Prerequisites
+*   Node.js 18+
+*   OpenAI API Key
+*   Supabase Project (URL & Anon Key)
+
+### Installation
+
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/yourusername/medai-platform.git
+    cd medai-platform/frontend
+    ```
+
+2.  **Install dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Configure Environment**
+    Create a `.env.local` file in the root directory:
+    ```bash
+    # AI Brain
+    OPENAI_API_KEY=sk-your-openai-key
+
+    # Auth & Database
+    NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+    ```
+
+4.  **Run the Development Server**
+    ```bash
+    npm run dev
+    ```
+
+5.  **Open the App**
+    Visit [http://localhost:3000](http://localhost:3000) to launch MedAI.
+
+---
+
+## 🗺 Roadmap Status
+
+*   ✅ **Phase 1**: Core AI & Dashboard (Completed)
+*   ✅ **Phase 2**: Smart Contracts & Web3 (Completed)
+*   ✅ **Phase 3**: Doctor Marketplace (Completed)
+*   🚧 **Phase 4**: Mainnet Deployment & Audits (In Progress)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+*Built with ❤️ by Aayush Kumar Singh*

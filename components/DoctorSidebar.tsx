@@ -44,12 +44,12 @@ export default function DoctorSidebar() {
                         className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#0a0a0a] border-r border-white/5 flex flex-col ${isOpen ? "shadow-2xl shadow-purple-900/20" : ""}`}
                     >
                         {/* Logo */}
-                        <div className="p-6 border-b border-white/5 flex items-center gap-3">
+                        <Link href="/" className="p-6 border-b border-white/5 flex items-center gap-3 hover:bg-white/5 transition-colors">
                             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
                                 <Stethoscope size={18} />
                             </div>
                             <span className="font-bold text-lg tracking-tight">MedAI <span className="text-blue-500 text-xs uppercase ml-1">Doctor</span></span>
-                        </div>
+                        </Link>
 
                         {/* Navigation */}
                         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
@@ -64,8 +64,8 @@ export default function DoctorSidebar() {
                                         href={item.href}
                                         onClick={() => setIsOpen(false)}
                                         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                                ? "bg-blue-600/10 text-blue-400 border border-blue-600/20 shadow-[0_0_15px_-3px_rgba(37,99,235,0.2)]"
-                                                : "text-gray-400 hover:text-white hover:bg-white/5"
+                                            ? "bg-blue-600/10 text-blue-400 border border-blue-600/20 shadow-[0_0_15px_-3px_rgba(37,99,235,0.2)]"
+                                            : "text-gray-400 hover:text-white hover:bg-white/5"
                                             }`}
                                     >
                                         <div className={`transition-colors ${isActive ? "text-blue-400" : "text-gray-500 group-hover:text-gray-300"}`}>
