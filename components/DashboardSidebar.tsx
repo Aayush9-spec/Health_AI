@@ -1,0 +1,102 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+    Activity,
+    MessageSquare,
+    Calendar,
+    FileText,
+    Wallet,
+    Settings,
+    LogOut,
+    Menu,
+    X
+} from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const sidebarItems = [
+    { icon: <MessageSquare size={20} />, label: "Health Assistant", href: "/dashboard" },
+    { icon: <Calendar size={20} />, label: "Appointments", href: "/dashboard/appointments" },
+    { icon: <FileText size={20} />, label: "Medical Records", href: "/dashboard/records" },
+    { icon: <Activity size={20} />, label: "Diagnostics", href: "/dashboard/diagnostics" },
+    { icon: <Wallet size={20} />, label: "Web3 Wallet", href: "/dashboard/wallet" },
+    { icon: <Settings size={20} />, label: "Settings", href: "/dashboard/settings" },
+];
+
+export default function DashboardSidebar() {
+    const pathname = usePathname();
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <>
+            {/* Mobile Toggle */}
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="md:hidden fixed top-4 left-4 z-50 p-2 bg-white/10 rounded-md text-white"
+            >
+                {isOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+
+            {/* Sidebar */}
+            <AnimatePresence mode="wait">
+                <motion.div
+                    className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#080808] border-r border-white/10 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"
+                        }`}
+                >
+                    <div className="flex flex-col h-full">
+                        {/* Logo */}
+                        <div className="h-20 flex items-center px-6 border-b border-white/10">
+                            <div className="w-8 h-8 bg-purple-600 rounded-sm flex items-center justify-center mr-3 font-bold text-white">
+                                M
+                            </div>
+                            <span className="font-bold text-xl text-white tracking-tight">MedAI</span>
+                        </div>
+
+                        {/* Navigation */}
+                        <nav className="flex-1 px-4 py-8 space-y-2">
+                            {sidebarItems.map((item) => {
+                                const isActive = pathname === item.href;
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        onClick={() => setIsOpen(false)}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${isActive
+                                                ? "bg-purple-600/10 text-purple-400 border border-purple-600/20"
+                                                : "text-gray-400 hover:text-white hover:bg-white/5"
+                                            }`}
+                                    >
+                                        {item.icon}
+                                        {item.label}
+                                    </Link>
+                                );
+                            })}
+                        </nav>
+
+                        {/* User Profile / Logout */}
+                        <div className="p-4 border-t border-white/10">
+                            <div className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white transition-colors cursor-pointer">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-white truncate">Dr. Aayush</p>
+                                    <p className="text-xs text-gray-500 truncate">Pro Member</p>
+                                </div>
+                                <LogOut size={18} />
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            </AnimatePresence>
+
+            {/* Overlay for mobile */}
+            {isOpen && (
+                <div
+                    className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden"
+                    onClick={() => setIsOpen(false)}
+                />
+            )}
+        </>
+    );
+}
