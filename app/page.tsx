@@ -99,6 +99,7 @@ const steps = [
     icon: <MessageCircle size={28} />,
     color: "text-purple-400",
     bg: "bg-purple-500/10",
+    href: "/dashboard/diagnostics",
   },
   {
     step: "02",
@@ -107,6 +108,7 @@ const steps = [
     icon: <Brain size={28} />,
     color: "text-blue-400",
     bg: "bg-blue-500/10",
+    href: "/dashboard/diagnostics",
   },
   {
     step: "03",
@@ -115,6 +117,7 @@ const steps = [
     icon: <Stethoscope size={28} />,
     color: "text-emerald-400",
     bg: "bg-emerald-500/10",
+    href: "/doctor",
   },
 ];
 
@@ -480,14 +483,14 @@ export default function Home() {
                   key={screen.title}
                   onClick={() => setActiveScreen(i)}
                   className={`w-full text-left p-6 rounded-xl border transition-all duration-300 ${activeScreen === i
-                      ? "border-purple-500/30 bg-purple-500/5 dark:bg-purple-500/10"
-                      : "border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.02] hover:border-gray-300 dark:hover:border-white/20"
+                    ? "border-purple-500/30 bg-purple-500/5 dark:bg-purple-500/10"
+                    : "border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.02] hover:border-gray-300 dark:hover:border-white/20"
                     }`}
                 >
                   <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-mono font-bold ${activeScreen === i
-                        ? "bg-purple-500 text-white"
-                        : "bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400"
+                      ? "bg-purple-500 text-white"
+                      : "bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400"
                       }`}>
                       {String(i + 1).padStart(2, "0")}
                     </div>
@@ -621,31 +624,36 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {steps.map((step, i) => (
-              <motion.div
-                key={step.step}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.15 }}
-                className="relative group"
-              >
-                {/* Connector line */}
-                {i < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-16 left-[calc(100%+1rem)] w-[calc(100%-2rem)] h-px bg-gradient-to-r from-gray-300 dark:from-white/10 to-transparent -translate-x-8" />
-                )}
+              <Link key={step.step} href={step.href} className="block relative group">
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.15 }}
+                  className="relative h-full"
+                >
+                  {/* Connector line */}
+                  {i < steps.length - 1 && (
+                    <div className="hidden md:block absolute top-16 left-[calc(100%+1rem)] w-[calc(100%-2rem)] h-px bg-gradient-to-r from-gray-300 dark:from-white/10 to-transparent -translate-x-8" />
+                  )}
 
-                <div className="p-8 bg-gray-50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/10 rounded-2xl hover:border-gray-300 dark:hover:border-white/20 transition-all relative overflow-hidden">
-                  <div className="absolute top-4 right-4 text-6xl font-black text-gray-100 dark:text-white/[0.03] leading-none select-none">
-                    {step.step}
+                  <div className="p-8 bg-gray-50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/10 rounded-2xl hover:border-purple-500/30 dark:hover:border-purple-500/30 hover:shadow-lg hover:shadow-purple-500/5 transition-all relative overflow-hidden cursor-pointer h-full">
+                    <div className="absolute top-4 right-4 text-6xl font-black text-gray-100 dark:text-white/[0.03] leading-none select-none">
+                      {step.step}
+                    </div>
+                    <div className={`w-14 h-14 rounded-2xl ${step.bg} flex items-center justify-center mb-6 ${step.color} group-hover:scale-110 transition-transform`}>
+                      {step.icon}
+                    </div>
+                    <div className="text-xs font-mono text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Step {step.step}</div>
+                    <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">{step.desc}</p>
+
+                    <div className="mt-4 flex items-center gap-1.5 text-sm font-medium text-purple-500 dark:text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                      Try it now <ArrowRight size={14} />
+                    </div>
                   </div>
-                  <div className={`w-14 h-14 rounded-2xl ${step.bg} flex items-center justify-center mb-6 ${step.color}`}>
-                    {step.icon}
-                  </div>
-                  <div className="text-xs font-mono text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Step {step.step}</div>
-                  <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">{step.desc}</p>
-                </div>
-              </motion.div>
+                </motion.div>
+              </Link>
             ))}
           </div>
         </section>
