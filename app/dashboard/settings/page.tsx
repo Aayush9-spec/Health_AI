@@ -1,12 +1,34 @@
 "use client";
 
-import { User, Bell, Lock, Shield, Smartphone, Globe, ToggleLeft, ToggleRight, LogOut } from "lucide-react";
+import { User, Bell, Lock, Shield, Smartphone, Globe, ToggleLeft, ToggleRight, LogOut, Save } from "lucide-react";
 import { useState } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
     const [medicalShare, setMedicalShare] = useState(true);
     const [notifications, setNotifications] = useState(true);
     const [faceId, setFaceId] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const router = useRouter();
+
+    const handleSignOut = async () => {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push("/login");
+        router.refresh();
+    };
+
+    const handleSaveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setSaving(true);
+        // Simulate save — in production, write to Supabase profiles table
+        await new Promise((r) => setTimeout(r, 800));
+        setSaving(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+    };
 
     return (
         <div className="space-y-8 max-w-4xl">
@@ -16,16 +38,28 @@ export default function SettingsPage() {
             </div>
 
             {/* Profile Section */}
-            <div className="bg-white/[0.02] border border-white/10 rounded-xl p-6">
-                <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                    <User size={20} className="text-purple-400" /> Profile Information
-                </h2>
+            <form onSubmit={handleSaveProfile} className="bg-white/[0.02] border border-white/10 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                        <User size={20} className="text-purple-400" /> Profile Information
+                    </h2>
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    >
+                        <Save size={14} />
+                        {saving ? "Saving..." : saved ? "Saved ✓" : "Save Changes"}
+                    </button>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                         <label className="text-sm text-gray-400">Full Name</label>
                         <input
                             type="text"
-                            defaultValue="Dr. Aayush Kumar Singh"
+                            name="fullName"
+                            defaultValue=""
+                            placeholder="Enter your full name"
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500/50"
                         />
                     </div>
@@ -33,7 +67,7 @@ export default function SettingsPage() {
                         <label className="text-sm text-gray-400">Medical ID</label>
                         <input
                             type="text"
-                            value="MED-8821-X99"
+                            value="Auto-generated on signup"
                             readOnly
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-gray-500 cursor-not-allowed"
                         />
@@ -42,7 +76,9 @@ export default function SettingsPage() {
                         <label className="text-sm text-gray-400">Email Address</label>
                         <input
                             type="email"
-                            defaultValue="aayush.singh@medai.protocol"
+                            name="email"
+                            defaultValue=""
+                            placeholder="your@email.com"
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500/50"
                         />
                     </div>
@@ -50,14 +86,16 @@ export default function SettingsPage() {
                         <label className="text-sm text-gray-400">Phone Number</label>
                         <input
                             type="tel"
-                            defaultValue="+91 98765 43210"
+                            name="phone"
+                            defaultValue=""
+                            placeholder="+91 12345 67890"
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500/50"
                         />
                     </div>
                 </div>
-            </div>
+            </form>
 
-            {/* Privacy & Security - Matching 'Cyber Security' notes */}
+            {/* Privacy & Security */}
             <div className="bg-white/[0.02] border border-white/10 rounded-xl p-6">
                 <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
                     <Shield size={20} className="text-green-400" /> Privacy & Security
@@ -126,7 +164,10 @@ export default function SettingsPage() {
             </div>
 
             <div className="pt-6 border-t border-white/10">
-                <button className="flex items-center gap-2 px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-colors font-medium">
+                <button
+                    onClick={handleSignOut}
+                    className="flex items-center gap-2 px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-colors font-medium"
+                >
                     <LogOut size={18} /> Sign Out
                 </button>
             </div>

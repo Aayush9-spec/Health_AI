@@ -23,7 +23,7 @@ import {
 
 const config = getDefaultConfig({
     appName: 'MedAI Platform',
-    projectId: 'YOUR_PROJECT_ID', // Get one at https://cloud.walletconnect.com
+    projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID', // Get one at https://cloud.walletconnect.com
     chains: [mainnet, polygon, optimism, arbitrum, base],
     ssr: true, // If your dApp uses server side rendering (SSR)
 });

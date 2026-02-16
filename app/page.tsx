@@ -60,13 +60,13 @@ export default function Home() {
           </div>
 
           <div className="hidden md:flex items-center gap-1 text-sm font-medium text-gray-400">
-            {["Diagnostics", "Protocol", "Nodes"].map((item) => (
+            {[{ label: "Diagnostics", href: "/dashboard/diagnostics" }, { label: "Dashboard", href: "/dashboard" }, { label: "Doctor Portal", href: "/doctor" }].map((item) => (
               <Link
-                key={item}
-                href="#"
+                key={item.label}
+                href={item.href}
                 className="px-6 py-2 hover:bg-white/5 rounded-full transition-colors hover:text-white"
               >
-                {item}
+                {item.label}
               </Link>
             ))}
           </div>
@@ -111,9 +111,9 @@ export default function Home() {
               <Link href="/dashboard" className="px-8 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-sm font-medium transition-all flex items-center gap-2">
                 Start Analysis <ArrowRight size={18} />
               </Link>
-              <button className="px-8 py-4 border border-white/20 hover:bg-white/5 text-white rounded-sm font-medium transition-all">
+              <Link href="https://github.com/Aayush9-spec/Health_AI" target="_blank" className="px-8 py-4 border border-white/20 hover:bg-white/5 text-white rounded-sm font-medium transition-all">
                 View Documentation
-              </button>
+              </Link>
             </motion.div>
           </div>
 
@@ -187,9 +187,9 @@ export default function Home() {
             © 2026 MedAI Protocol. All rights reserved.
           </div>
           <div className="flex gap-8 text-sm">
-            <Link href="#" className="text-gray-500 hover:text-white transition-colors">Twitter</Link>
+            <Link href="https://twitter.com" target="_blank" className="text-gray-500 hover:text-white transition-colors">Twitter</Link>
             <Link href="https://github.com/Aayush9-spec/Health_AI" className="text-gray-500 hover:text-white transition-colors">GitHub</Link>
-            <Link href="#" className="text-gray-500 hover:text-white transition-colors">Discord</Link>
+            <Link href="https://discord.com" target="_blank" className="text-gray-500 hover:text-white transition-colors">Discord</Link>
           </div>
         </div>
       </footer>

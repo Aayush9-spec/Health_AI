@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     Activity,
     MessageSquare,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { createClient } from "@/utils/supabase/client";
 
 const sidebarItems = [
     { icon: <MessageSquare size={20} />, label: "Health Assistant", href: "/dashboard" },
@@ -27,7 +28,15 @@ const sidebarItems = [
 
 export default function DashboardSidebar() {
     const pathname = usePathname();
+    const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
+
+    const handleSignOut = async () => {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push("/login");
+        router.refresh();
+    };
 
     return (
         <>
@@ -46,7 +55,6 @@ export default function DashboardSidebar() {
                         }`}
                 >
                     <div className="flex flex-col h-full">
-                        {/* Logo */}
                         {/* Logo */}
                         <Link href="/" className="h-20 flex items-center px-6 border-b border-white/10 hover:bg-white/5 transition-colors">
                             <div className="w-8 h-8 bg-purple-600 rounded-sm flex items-center justify-center mr-3 font-bold text-white">
@@ -78,14 +86,17 @@ export default function DashboardSidebar() {
 
                         {/* User Profile / Logout */}
                         <div className="p-4 border-t border-white/10">
-                            <div className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white transition-colors cursor-pointer">
+                            <button
+                                onClick={handleSignOut}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+                            >
                                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-white truncate">Dr. Aayush</p>
-                                    <p className="text-xs text-gray-500 truncate">Pro Member</p>
+                                <div className="flex-1 min-w-0 text-left">
+                                    <p className="text-sm font-medium text-white truncate">Patient</p>
+                                    <p className="text-xs text-gray-500 truncate">Sign Out</p>
                                 </div>
                                 <LogOut size={18} />
-                            </div>
+                            </button>
                         </div>
                     </div>
                 </motion.div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     BriefcaseMedical,
     CalendarCheck,
@@ -14,6 +14,7 @@ import {
     Stethoscope
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { createClient } from "@/utils/supabase/client";
 
 const sidebarItems = [
     { icon: <BriefcaseMedical size={20} />, label: "Doctor Dashboard", href: "/doctor" },
@@ -24,7 +25,15 @@ const sidebarItems = [
 
 export default function DoctorSidebar() {
     const pathname = usePathname();
+    const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
+
+    const handleSignOut = async () => {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push("/login");
+        router.refresh();
+    };
 
     return (
         <>
@@ -79,15 +88,18 @@ export default function DoctorSidebar() {
 
                         {/* User Profile */}
                         <div className="p-4 border-t border-white/5">
-                            <div className="bg-white/5 rounded-xl p-3 flex items-center gap-3 border border-white/5 hover:border-white/10 transition-colors cursor-pointer group">
+                            <div className="bg-white/5 rounded-xl p-3 flex items-center gap-3 border border-white/5 hover:border-white/10 transition-colors group">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-sm shadow-lg">
-                                    SC
+                                    DR
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium truncate group-hover:text-blue-400 transition-colors">Dr. Sarah Chen</div>
-                                    <div className="text-xs text-gray-500 truncate">General Physician</div>
+                                    <div className="text-sm font-medium truncate group-hover:text-blue-400 transition-colors">Doctor</div>
+                                    <div className="text-xs text-gray-500 truncate">Provider Portal</div>
                                 </div>
-                                <button className="text-gray-500 hover:text-red-400 transition-colors">
+                                <button
+                                    onClick={handleSignOut}
+                                    className="text-gray-500 hover:text-red-400 transition-colors"
+                                >
                                     <LogOut size={18} />
                                 </button>
                             </div>

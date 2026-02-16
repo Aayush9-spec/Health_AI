@@ -16,6 +16,7 @@ export default function PrescriptionsPage() {
     const [diagnosis, setDiagnosis] = useState("");
     const [notes, setNotes] = useState("");
     const [isSent, setIsSent] = useState(false);
+    const [draftSaved, setDraftSaved] = useState(false);
 
     const addMedicine = () => {
         setMedicines([...medicines, { name: "", dosage: "", duration: "" }]);
@@ -50,8 +51,16 @@ export default function PrescriptionsPage() {
                     <p className="text-gray-400 text-sm">Create and digitally sign prescriptions for patients</p>
                 </div>
                 <div className="flex gap-3">
-                    <button className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors flex items-center gap-2">
-                        <Save size={16} /> Save Draft
+                    <button
+                        onClick={() => {
+                            const draft = { selectedPatient, medicines, diagnosis, notes, savedAt: new Date().toISOString() };
+                            localStorage.setItem('prescription-draft', JSON.stringify(draft));
+                            setDraftSaved(true);
+                            setTimeout(() => setDraftSaved(false), 2000);
+                        }}
+                        className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                        <Save size={16} /> {draftSaved ? 'Saved ✓' : 'Save Draft'}
                     </button>
                 </div>
             </div>
@@ -78,8 +87,8 @@ export default function PrescriptionsPage() {
                                     key={p.id}
                                     onClick={() => setSelectedPatient(p.id)}
                                     className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors border ${selectedPatient === p.id
-                                            ? "bg-blue-600/10 border-blue-500/30"
-                                            : "bg-white/5 border-transparent hover:bg-white/10"
+                                        ? "bg-blue-600/10 border-blue-500/30"
+                                        : "bg-white/5 border-transparent hover:bg-white/10"
                                         }`}
                                 >
                                     <div>

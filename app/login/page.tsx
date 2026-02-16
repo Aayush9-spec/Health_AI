@@ -151,7 +151,19 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    <button className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            const supabase = createClient();
+                            await supabase.auth.signInWithOAuth({
+                                provider: 'github',
+                                options: {
+                                    redirectTo: `${window.location.origin}/auth/callback`,
+                                },
+                            });
+                        }}
+                        className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    >
                         <Github size={18} /> GitHub
                     </button>
                 </div>
