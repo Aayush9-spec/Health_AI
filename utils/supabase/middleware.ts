@@ -32,8 +32,12 @@ export async function updateSession(request: NextRequest) {
         }
     )
 
-    // Do not run on login or public pages
-    if (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname === '/') {
+    // Do not run on login, signup, or public pages
+    if (
+        request.nextUrl.pathname.startsWith('/login') ||
+        request.nextUrl.pathname.startsWith('/signup') ||
+        request.nextUrl.pathname === '/'
+    ) {
         return supabaseResponse
     }
 
@@ -57,6 +61,7 @@ export async function updateSession(request: NextRequest) {
     if (
         !user &&
         !request.nextUrl.pathname.startsWith('/login') &&
+        !request.nextUrl.pathname.startsWith('/signup') &&
         !request.nextUrl.pathname.startsWith('/auth') &&
         request.nextUrl.pathname !== '/'
     ) {
