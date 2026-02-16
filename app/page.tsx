@@ -22,6 +22,7 @@ const services = [
     border: "border-purple-500/20",
     iconColor: "text-purple-400",
     span: "md:col-span-2",
+    href: "/dashboard/diagnostics",
   },
   {
     title: "Doctor Consultations",
@@ -31,6 +32,7 @@ const services = [
     border: "border-blue-500/20",
     iconColor: "text-blue-400",
     span: "md:col-span-1",
+    href: "/doctor",
   },
   {
     title: "Health Records",
@@ -40,6 +42,7 @@ const services = [
     border: "border-emerald-500/20",
     iconColor: "text-emerald-400",
     span: "md:col-span-1",
+    href: "/dashboard/records",
   },
   {
     title: "Web3 Health Wallet",
@@ -49,6 +52,7 @@ const services = [
     border: "border-orange-500/20",
     iconColor: "text-orange-400",
     span: "md:col-span-2",
+    href: "/dashboard/wallet",
   },
   {
     title: "Appointment Booking",
@@ -58,6 +62,7 @@ const services = [
     border: "border-cyan-500/20",
     iconColor: "text-cyan-400",
     span: "md:col-span-1",
+    href: "/dashboard/appointments",
   },
   {
     title: "Real-Time Vitals",
@@ -67,6 +72,7 @@ const services = [
     border: "border-rose-500/20",
     iconColor: "text-rose-400",
     span: "md:col-span-1",
+    href: "/dashboard/vitals",
   },
 ];
 
@@ -412,32 +418,33 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {services.map((service, i) => (
-              <motion.div
-                key={service.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.08 }}
-                className={`group relative p-8 rounded-2xl border ${service.border} bg-gradient-to-br ${service.color} backdrop-blur-sm overflow-hidden hover:border-white/20 transition-all duration-300 ${service.span}`}
-              >
-                {/* Mouse glow */}
-                <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                  style={{
-                    background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(139, 92, 246, 0.06), transparent 40%)`,
-                  }}
-                />
+              <Link key={service.title} href={service.href} className={`block ${service.span}`}>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08 }}
+                  className={`group relative p-8 rounded-2xl border ${service.border} bg-gradient-to-br ${service.color} backdrop-blur-sm overflow-hidden hover:border-white/20 transition-all duration-300 cursor-pointer h-full`}
+                >
+                  {/* Mouse glow */}
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                    style={{
+                      background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(139, 92, 246, 0.06), transparent 40%)`,
+                    }}
+                  />
 
-                <div className={`w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-5 ${service.iconColor} group-hover:scale-110 transition-transform`}>
-                  {service.icon}
-                </div>
-                <h3 className="text-xl font-semibold mb-2">{service.title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{service.desc}</p>
+                  <div className={`w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-5 ${service.iconColor} group-hover:scale-110 transition-transform`}>
+                    {service.icon}
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">{service.title}</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed">{service.desc}</p>
 
-                <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                  <ArrowRight className="text-white/20" size={20} />
-                </div>
-              </motion.div>
+                  <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                    <ArrowRight className="text-white/40" size={20} />
+                  </div>
+                </motion.div>
+              </Link>
             ))}
           </div>
         </section>
