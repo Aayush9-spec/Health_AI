@@ -6,7 +6,7 @@
 
 ## 🚀 Key Features
 
-### 1. **AI Health Assistant (The Brain)**
+### 1. **AI Health Assistant (The Brain)** 
    *   **Real-time Diagnosis**: Uses **OpenAI GPT-4o** to analyze symptoms and provide preliminary medical advice with disclaimers.
    *   **Voice Interface**: Natural language voice commands for hands-free interaction.
    *   **Actionable Insights**: Automatically detects intent (e.g., "Book appointment") and triggers relevant UI flows.
