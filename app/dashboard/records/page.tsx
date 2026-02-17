@@ -41,15 +41,36 @@ export default function MedicalRecordsPage() {
         if (!file) return;
 
         setScanLoading(true);
-        // Simulate AI analysis — in production, send to OpenAI Vision API
-        await new Promise((r) => setTimeout(r, 2000));
-        setScanResult(
-            `✅ Medicine Verified: ${file.name}\n\n` +
-            `• Active Ingredient: Acetaminophen 650mg\n` +
-            `• Batch: Valid (Exp: Dec 2027)\n` +
-            `• Manufacturer: Verified Pharma Corp\n\n` +
-            `This medicine matches your prescription.`
-        );
+        setScanResult(null);
+
+        try {
+            // Convert file to base64 data URI
+            const reader = new FileReader();
+            const base64Promise = new Promise<string>((resolve, reject) => {
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+            });
+            reader.readAsDataURL(file);
+            const base64Image = await base64Promise;
+
+            // Send to OpenAI Vision via our API route
+            const response = await fetch("/api/scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: base64Image }),
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                setScanResult(`❌ Error: ${data.error}`);
+            } else {
+                setScanResult(data.result);
+            }
+        } catch (err: any) {
+            setScanResult(`❌ Analysis failed: ${err?.message || "Unknown error"}`);
+        }
+
         setScanLoading(false);
     };
 
