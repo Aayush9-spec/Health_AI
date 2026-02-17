@@ -428,3 +428,374 @@ export async function createPrescription(data: {
 
     return true;
 }
+
+// ─── Vitals ─────────────────────────────────────────────────────────
+
+export interface VitalEntry {
+    id: string;
+    patient_id: string;
+    heart_rate: number | null;
+    systolic: number | null;
+    diastolic: number | null;
+    spo2: number | null;
+    temperature: number | null;
+    respiratory_rate: number | null;
+    notes: string | null;
+    recorded_at: string;
+}
+
+export async function logVitals(data: {
+    patient_id: string;
+    heart_rate?: number;
+    systolic?: number;
+    diastolic?: number;
+    spo2?: number;
+    temperature?: number;
+    respiratory_rate?: number;
+    notes?: string;
+}): Promise<boolean> {
+    const supabase = createClient();
+    const { error } = await supabase.from("vitals").insert(data);
+    if (error) {
+        console.error("Error logging vitals:", error.message);
+        return false;
+    }
+    return true;
+}
+
+export async function getVitalsHistory(
+    userId: string,
+    limit: number = 20
+): Promise<VitalEntry[]> {
+    const supabase = createClient();
+    const { data, error } = await supabase
+        .from("vitals")
+        .select("*")
+        .eq("patient_id", userId)
+        .order("recorded_at", { ascending: false })
+        .limit(limit);
+
+    if (error) {
+        console.error("Error fetching vitals:", error.message);
+        return [];
+    }
+    return data ?? [];
+}
+
+// ─── Lab Tests & Bookings ───────────────────────────────────────────
+
+export interface LabTest {
+    id: string;
+    name: string;
+    category: "pathlab" | "radiology";
+    description: string | null;
+    price: number;
+    duration: string | null;
+    preparation: string | null;
+    available: boolean;
+}
+
+export interface LabBooking {
+    id: string;
+    patient_id: string;
+    test_id: string;
+    date: string;
+    time: string | null;
+    location: string;
+    status: string;
+    result_summary: string | null;
+    created_at: string;
+    // Joined
+    lab_test?: LabTest;
+}
+
+export async function getLabTests(
+    category: "pathlab" | "radiology"
+): Promise<LabTest[]> {
+    const supabase = createClient();
+    const { data, error } = await supabase
+        .from("lab_tests")
+        .select("*")
+        .eq("category", category)
+        .eq("available", true)
+        .order("name");
+
+    if (error) {
+        console.error("Error fetching lab tests:", error.message);
+        return [];
+    }
+    return data ?? [];
+}
+
+export async function bookLabTest(booking: {
+    patient_id: string;
+    test_id: string;
+    date: string;
+    time?: string;
+    location?: string;
+}): Promise<boolean> {
+    const supabase = createClient();
+    const { error } = await supabase.from("lab_bookings").insert({
+        ...booking,
+        status: "booked",
+    });
+
+    if (error) {
+        console.error("Error booking lab test:", error.message);
+        return false;
+    }
+    return true;
+}
+
+export async function getLabBookings(
+    userId: string,
+    category?: "pathlab" | "radiology"
+): Promise<LabBooking[]> {
+    const supabase = createClient();
+    let query = supabase
+        .from("lab_bookings")
+        .select("*, lab_test:lab_tests(*)")
+        .eq("patient_id", userId)
+        .order("created_at", { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error) {
+        console.error("Error fetching lab bookings:", error.message);
+        return [];
+    }
+
+    // Filter by category client-side if needed
+    if (category && data) {
+        return data.filter((b: any) => b.lab_test?.category === category);
+    }
+    return data ?? [];
+}
+
+// ─── Doctor Dashboard Stats ─────────────────────────────────────────
+
+export interface DoctorStats {
+    todayAppointments: number;
+    totalPatients: number;
+    pendingReports: number;
+    totalPrescriptions: number;
+}
+
+export async function getDoctorStats(doctorUserId: string): Promise<DoctorStats> {
+    const supabase = createClient();
+
+    const { data: doctorRow } = await supabase
+        .from("doctors")
+        .select("id")
+        .eq("user_id", doctorUserId)
+        .single();
+
+    if (!doctorRow) {
+        return { todayAppointments: 0, totalPatients: 0, pendingReports: 0, totalPrescriptions: 0 };
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+
+    // Today's appointments
+    const { count: todayCount } = await supabase
+        .from("appointments")
+        .select("*", { count: "exact", head: true })
+        .eq("doctor_id", doctorRow.id)
+        .eq("date", today);
+
+    // Total unique patients
+    const { data: allApts } = await supabase
+        .from("appointments")
+        .select("patient_id")
+        .eq("doctor_id", doctorRow.id);
+
+    const uniquePatients = new Set(allApts?.map((a) => a.patient_id) ?? []);
+
+    // Pending medical records
+    const { count: pendingCount } = await supabase
+        .from("medical_records")
+        .select("*", { count: "exact", head: true })
+        .eq("doctor_id", doctorRow.id)
+        .eq("status", "Pending Order");
+
+    // Total prescriptions
+    const { count: prescCount } = await supabase
+        .from("prescriptions")
+        .select("*", { count: "exact", head: true })
+        .eq("doctor_id", doctorRow.id);
+
+    return {
+        todayAppointments: todayCount ?? 0,
+        totalPatients: uniquePatients.size,
+        pendingReports: pendingCount ?? 0,
+        totalPrescriptions: prescCount ?? 0,
+    };
+}
+
+// ─── Doctor Appointments ────────────────────────────────────────────
+
+export interface DoctorAppointment {
+    id: string;
+    patient_id: string;
+    doctor_id: string;
+    date: string;
+    time: string;
+    type: "online" | "offline";
+    status: string;
+    meet_link: string | null;
+    notes: string | null;
+    created_at: string;
+    // Joined
+    patient?: { full_name: string | null; email: string | null };
+}
+
+export async function getDoctorAppointments(
+    doctorUserId: string,
+    filter?: "upcoming" | "completed" | "cancelled"
+): Promise<DoctorAppointment[]> {
+    const supabase = createClient();
+
+    const { data: doctorRow } = await supabase
+        .from("doctors")
+        .select("id")
+        .eq("user_id", doctorUserId)
+        .single();
+
+    if (!doctorRow) return [];
+
+    let query = supabase
+        .from("appointments")
+        .select("*, patient:profiles!appointments_patient_id_fkey(full_name, email)")
+        .eq("doctor_id", doctorRow.id)
+        .order("date", { ascending: true })
+        .order("time", { ascending: true });
+
+    if (filter) {
+        query = query.eq("status", filter);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+        console.error("Error fetching doctor appointments:", error.message);
+        return [];
+    }
+    return (data ?? []) as unknown as DoctorAppointment[];
+}
+
+export async function updateAppointmentStatus(
+    appointmentId: string,
+    status: "upcoming" | "completed" | "cancelled"
+): Promise<boolean> {
+    const supabase = createClient();
+    const { error } = await supabase
+        .from("appointments")
+        .update({ status })
+        .eq("id", appointmentId);
+
+    if (error) {
+        console.error("Error updating appointment status:", error.message);
+        return false;
+    }
+    return true;
+}
+
+export async function getNextDoctorAppointment(
+    doctorUserId: string
+): Promise<DoctorAppointment | null> {
+    const supabase = createClient();
+
+    const { data: doctorRow } = await supabase
+        .from("doctors")
+        .select("id")
+        .eq("user_id", doctorUserId)
+        .single();
+
+    if (!doctorRow) return null;
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const { data, error } = await supabase
+        .from("appointments")
+        .select("*, patient:profiles!appointments_patient_id_fkey(full_name, email)")
+        .eq("doctor_id", doctorRow.id)
+        .eq("status", "upcoming")
+        .gte("date", today)
+        .order("date", { ascending: true })
+        .order("time", { ascending: true })
+        .limit(1)
+        .single();
+
+    if (error || !data) return null;
+    return data as unknown as DoctorAppointment;
+}
+
+// ─── Diagnostics Helper ─────────────────────────────────────────────
+
+export async function getRecentActivity(userId: string): Promise<
+    { date: string; event: string; status: string; color: string }[]
+> {
+    const supabase = createClient();
+    const activities: { date: string; event: string; status: string; color: string }[] = [];
+
+    // Recent appointments
+    const { data: apts } = await supabase
+        .from("appointments")
+        .select("date, status, doctor:doctors(name, specialty)")
+        .eq("patient_id", userId)
+        .order("date", { ascending: false })
+        .limit(3);
+
+    if (apts) {
+        for (const a of apts) {
+            const doc = a.doctor as any;
+            activities.push({
+                date: new Date(a.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                event: `Consultation — ${doc?.name || "Doctor"}`,
+                status: a.status === "completed" ? "Completed" : a.status === "upcoming" ? "Scheduled" : a.status,
+                color: a.status === "completed" ? "text-green-400" : "text-blue-400",
+            });
+        }
+    }
+
+    // Recent lab bookings
+    const { data: labs } = await supabase
+        .from("lab_bookings")
+        .select("date, status, lab_test:lab_tests(name)")
+        .eq("patient_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(2);
+
+    if (labs) {
+        for (const l of labs) {
+            const test = l.lab_test as any;
+            activities.push({
+                date: new Date(l.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                event: `Lab Test — ${test?.name || "Test"}`,
+                status: l.status === "completed" ? "Completed" : "Scheduled",
+                color: l.status === "completed" ? "text-green-400" : "text-purple-400",
+            });
+        }
+    }
+
+    // Recent prescriptions
+    const { data: recs } = await supabase
+        .from("medical_records")
+        .select("date, status, diagnosis")
+        .eq("patient_id", userId)
+        .order("date", { ascending: false })
+        .limit(2);
+
+    if (recs) {
+        for (const r of recs) {
+            activities.push({
+                date: new Date(r.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                event: `Prescription — ${r.diagnosis || "Medication"}`,
+                status: r.status === "Delivered" ? "Delivered" : r.status,
+                color: r.status === "Delivered" ? "text-purple-400" : "text-yellow-400",
+            });
+        }
+    }
+
+    return activities.slice(0, 5);
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Lock, Mail, Loader2, Github, Eye, EyeOff, User, Check, X, ArrowLeft } from "lucide-react";
+import { Activity, Lock, Mail, Loader2, Github, Eye, EyeOff, User, Check, X, ArrowLeft, Stethoscope, MapPin, Video } from "lucide-react";
 import { useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -30,6 +30,9 @@ export default function SignupPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [role, setRole] = useState<"patient" | "doctor">("patient");
+    const [specialty, setSpecialty] = useState("");
+    const [meetLink, setMeetLink] = useState("");
     const router = useRouter();
     const supabase = createClient();
 
@@ -54,13 +57,20 @@ export default function SignupPage() {
         setError(null);
 
         try {
+            const metadata: Record<string, string> = {
+                full_name: fullName,
+                role,
+            };
+            if (role === "doctor") {
+                metadata.specialty = specialty || "General Physician";
+                metadata.meet_link = meetLink;
+            }
+
             const { error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
-                    data: {
-                        full_name: fullName,
-                    },
+                    data: metadata,
                 },
             });
 
@@ -227,6 +237,75 @@ export default function SignupPage() {
                                 />
                             </div>
                         </motion.div>
+
+                        {/* Role Selector */}
+                        <motion.div
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.12 }}
+                            className="space-y-1.5"
+                        >
+                            <label className="text-sm text-gray-400 ml-1">I am a</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setRole("patient")}
+                                    className={`py-2.5 rounded-xl border text-sm font-medium transition-all flex items-center justify-center gap-2 ${role === "patient"
+                                            ? "bg-purple-600/20 border-purple-500/40 text-purple-300"
+                                            : "bg-black/40 border-white/10 text-gray-400 hover:bg-white/5"
+                                        }`}
+                                >
+                                    <User size={16} /> Patient
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setRole("doctor")}
+                                    className={`py-2.5 rounded-xl border text-sm font-medium transition-all flex items-center justify-center gap-2 ${role === "doctor"
+                                            ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
+                                            : "bg-black/40 border-white/10 text-gray-400 hover:bg-white/5"
+                                        }`}
+                                >
+                                    <Stethoscope size={16} /> Doctor
+                                </button>
+                            </div>
+                        </motion.div>
+
+                        {/* Doctor-specific fields */}
+                        {role === "doctor" && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="space-y-4"
+                            >
+                                <div className="space-y-1.5">
+                                    <label className="text-sm text-gray-400 ml-1">Specialty</label>
+                                    <div className="relative">
+                                        <Stethoscope className="absolute left-3 top-3 text-gray-500" size={18} />
+                                        <input
+                                            type="text"
+                                            value={specialty}
+                                            onChange={(e) => setSpecialty(e.target.value)}
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-colors"
+                                            placeholder="e.g. Cardiologist, Dermatologist"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-sm text-gray-400 ml-1">Meet / Video Call Link <span className="text-gray-600">(optional)</span></label>
+                                    <div className="relative">
+                                        <Video className="absolute left-3 top-3 text-gray-500" size={18} />
+                                        <input
+                                            type="url"
+                                            value={meetLink}
+                                            onChange={(e) => setMeetLink(e.target.value)}
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-colors"
+                                            placeholder="https://meet.google.com/..."
+                                        />
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
 
                         {/* Email */}
                         <motion.div
