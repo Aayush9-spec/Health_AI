@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Save, Send, FileText, User, Search, CheckCircle, Loader2 } from "lucide-react";
+import { Plus, Trash2, Save, Send, FileText, User, Search, CheckCircle, Loader2, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     getDoctorPatientsList,
     createPrescription,
     getCurrentUserId,
 } from "@/lib/supabase-helpers";
+import jsPDF from "jspdf";
 
 export default function PrescriptionsPage() {
     const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
@@ -108,6 +109,85 @@ export default function PrescriptionsPage() {
                     <p className="text-gray-400 text-sm">Create and digitally sign prescriptions for patients</p>
                 </div>
                 <div className="flex gap-3">
+                    <button
+                        onClick={() => {
+                            const doc = new jsPDF();
+                            const w = doc.internal.pageSize.getWidth();
+                            // Header
+                            doc.setFillColor(88, 28, 135);
+                            doc.rect(0, 0, w, 35, "F");
+                            doc.setTextColor(255, 255, 255);
+                            doc.setFontSize(20);
+                            doc.setFont("helvetica", "bold");
+                            doc.text("MedAI Prescription", 14, 22);
+                            doc.setFontSize(10);
+                            doc.setFont("helvetica", "normal");
+                            doc.text(prescriptionNumber, w - 14, 22, { align: "right" });
+                            doc.text(todayDate, w - 14, 28, { align: "right" });
+
+                            // Patient info
+                            doc.setTextColor(0, 0, 0);
+                            const patientName = patients.find(p => p.id === selectedPatient)?.name || "—";
+                            doc.setFontSize(12);
+                            doc.setFont("helvetica", "bold");
+                            doc.text("Patient:", 14, 48);
+                            doc.setFont("helvetica", "normal");
+                            doc.text(patientName, 42, 48);
+
+                            // Diagnosis
+                            doc.setFont("helvetica", "bold");
+                            doc.text("Diagnosis:", 14, 58);
+                            doc.setFont("helvetica", "normal");
+                            const diagLines = doc.splitTextToSize(diagnosis || "—", w - 55);
+                            doc.text(diagLines, 42, 58);
+
+                            // Medicine table
+                            let y = 58 + diagLines.length * 6 + 10;
+                            doc.setFont("helvetica", "bold");
+                            doc.setFillColor(245, 245, 245);
+                            doc.rect(14, y - 5, w - 28, 8, "F");
+                            doc.setFontSize(10);
+                            doc.text("#", 16, y);
+                            doc.text("Medicine", 26, y);
+                            doc.text("Dosage", 110, y);
+                            doc.text("Duration", 150, y);
+                            y += 8;
+
+                            doc.setFont("helvetica", "normal");
+                            medicines.filter(m => m.name).forEach((med, i) => {
+                                doc.text(String(i + 1), 16, y);
+                                doc.text(med.name, 26, y);
+                                doc.text(med.dosage, 110, y);
+                                doc.text(med.duration, 150, y);
+                                y += 7;
+                            });
+
+                            // Notes
+                            if (notes) {
+                                y += 5;
+                                doc.setFont("helvetica", "bold");
+                                doc.text("Notes:", 14, y);
+                                doc.setFont("helvetica", "normal");
+                                const noteLines = doc.splitTextToSize(notes, w - 28);
+                                doc.text(noteLines, 14, y + 7);
+                            }
+
+                            // Footer
+                            const pageH = doc.internal.pageSize.getHeight();
+                            doc.setDrawColor(200);
+                            doc.line(14, pageH - 30, w - 14, pageH - 30);
+                            doc.setFontSize(9);
+                            doc.setTextColor(128);
+                            doc.text("Digitally signed via MedAI Platform", 14, pageH - 22);
+                            doc.text("This prescription is digitally generated and verified.", 14, pageH - 16);
+
+                            doc.save(`prescription-${prescriptionNumber}.pdf`);
+                        }}
+                        disabled={!selectedPatient || medicines.every(m => !m.name)}
+                        className="px-4 py-2 bg-green-600/20 border border-green-500/20 rounded-lg text-sm font-medium hover:bg-green-600/30 transition-colors flex items-center gap-2 text-green-400 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <Download size={16} /> Download PDF
+                    </button>
                     <button
                         onClick={() => {
                             const draft = { selectedPatient, medicines, diagnosis, notes, savedAt: new Date().toISOString() };

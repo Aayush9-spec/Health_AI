@@ -198,14 +198,12 @@ function LoginContent() {
                         >
                             <div className="flex items-center justify-between">
                                 <label className="text-sm text-gray-400 ml-1">Password</label>
-                                <button
-                                    type="button"
-                                    onClick={handleForgotPassword}
-                                    disabled={resetSent}
-                                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors disabled:text-gray-600"
+                                <Link
+                                    href="/forgot-password"
+                                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
                                 >
-                                    {resetSent ? "Reset link sent ✓" : "Forgot password?"}
-                                </button>
+                                    Forgot password?
+                                </Link>
                             </div>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-3 text-gray-500" size={18} />

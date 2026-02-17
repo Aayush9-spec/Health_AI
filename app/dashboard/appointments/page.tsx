@@ -9,6 +9,7 @@ import {
     getAppointments,
     bookAppointment,
     rescheduleAppointment,
+    cancelAppointment,
     getCurrentUserId,
     type Doctor,
     type Appointment,
@@ -25,6 +26,7 @@ export default function AppointmentsPage() {
     const [bookingTime, setBookingTime] = useState("");
     const [loading, setLoading] = useState(true);
     const [booking, setBooking] = useState(false);
+    const [cancelling, setCancelling] = useState<string | null>(null);
 
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
@@ -52,6 +54,15 @@ export default function AppointmentsPage() {
         }
         loadData();
     }, []);
+
+    const handleCancel = async (id: string) => {
+        setCancelling(id);
+        const success = await cancelAppointment(id);
+        if (success) {
+            setUpcomingAppointments((prev) => prev.filter((a) => a.id !== id));
+        }
+        setCancelling(null);
+    };
 
     const handleJoinMeet = (meetLink: string | null) => {
         if (meetLink) {
@@ -328,12 +339,21 @@ export default function AppointmentsPage() {
                                             </button>
                                         </div>
                                     ) : (
-                                        <button
-                                            onClick={() => handleReschedule(apt.id)}
-                                            className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-gray-400"
-                                        >
-                                            Reschedule
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={() => handleReschedule(apt.id)}
+                                                className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-gray-400"
+                                            >
+                                                Reschedule
+                                            </button>
+                                            <button
+                                                onClick={() => handleCancel(apt.id)}
+                                                disabled={cancelling === apt.id}
+                                                className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-sm transition-colors text-red-400 disabled:opacity-50"
+                                            >
+                                                {cancelling === apt.id ? "Cancelling..." : "Cancel"}
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             </div>
