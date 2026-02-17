@@ -1,22 +1,44 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Trash2, Save, Send, FileText, User, Search, CheckCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Trash2, Save, Send, FileText, User, Search, CheckCircle, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const patients = [
-    { id: 1, name: "Michael P.", age: 34, gender: "M", lastVisit: "Feb 10" },
-    { id: 2, name: "Sarah J.", age: 28, gender: "F", lastVisit: "Feb 12" },
-    { id: 3, name: "David L.", age: 45, gender: "M", lastVisit: "Jan 28" },
-];
+import {
+    getDoctorPatientsList,
+    createPrescription,
+    getCurrentUserId,
+} from "@/lib/supabase-helpers";
 
 export default function PrescriptionsPage() {
-    const [selectedPatient, setSelectedPatient] = useState<number | null>(null);
+    const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
     const [medicines, setMedicines] = useState([{ name: "", dosage: "", duration: "" }]);
     const [diagnosis, setDiagnosis] = useState("");
     const [notes, setNotes] = useState("");
     const [isSent, setIsSent] = useState(false);
+    const [isSending, setIsSending] = useState(false);
     const [draftSaved, setDraftSaved] = useState(false);
+    const [patients, setPatients] = useState<{ id: string; name: string; lastVisit: string | null }[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    // Load patients on mount
+    useEffect(() => {
+        async function loadPatients() {
+            const userId = await getCurrentUserId();
+            if (!userId) {
+                setLoading(false);
+                return;
+            }
+            const data = await getDoctorPatientsList(userId);
+            setPatients(data);
+            setLoading(false);
+        }
+        loadPatients();
+    }, []);
+
+    const filteredPatients = patients.filter((p) =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     const addMedicine = () => {
         setMedicines([...medicines, { name: "", dosage: "", duration: "" }]);
@@ -34,14 +56,49 @@ export default function PrescriptionsPage() {
         setMedicines(newMedicines);
     };
 
-    const handleSend = () => {
-        setIsSent(true);
-        setTimeout(() => {
-            setIsSent(false);
-            // Reset form or show success message permanently
-            // For demo, we just toggle back after a delay
-        }, 3000);
+    const handleSend = async () => {
+        if (!selectedPatient) return;
+
+        setIsSending(true);
+        const userId = await getCurrentUserId();
+        if (!userId) {
+            setIsSending(false);
+            return;
+        }
+
+        const success = await createPrescription({
+            doctorUserId: userId,
+            patientId: selectedPatient,
+            diagnosis,
+            notes,
+            medicines,
+        });
+
+        setIsSending(false);
+
+        if (success) {
+            setIsSent(true);
+            setTimeout(() => {
+                setIsSent(false);
+                // Reset form
+                setSelectedPatient(null);
+                setDiagnosis("");
+                setNotes("");
+                setMedicines([{ name: "", dosage: "", duration: "" }]);
+            }, 3000);
+        }
     };
+
+    const prescriptionNumber = `RX-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const todayDate = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="animate-spin text-blue-500" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-5xl mx-auto space-y-8">
@@ -77,27 +134,35 @@ export default function PrescriptionsPage() {
                             <Search className="absolute left-3 top-2.5 text-gray-500" size={16} />
                             <input
                                 type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Search patient..."
                                 className="w-full bg-black/40 border border-white/10 rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-blue-500/50"
                             />
                         </div>
                         <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                            {patients.map((p) => (
-                                <button
-                                    key={p.id}
-                                    onClick={() => setSelectedPatient(p.id)}
-                                    className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors border ${selectedPatient === p.id
-                                        ? "bg-blue-600/10 border-blue-500/30"
-                                        : "bg-white/5 border-transparent hover:bg-white/10"
-                                        }`}
-                                >
-                                    <div>
-                                        <div className={`font-medium ${selectedPatient === p.id ? "text-blue-400" : "text-gray-200"}`}>{p.name}</div>
-                                        <div className="text-xs text-gray-500">{p.age} {p.gender} • Last: {p.lastVisit}</div>
-                                    </div>
-                                    {selectedPatient === p.id && <CheckCircle size={16} className="text-blue-500" />}
-                                </button>
-                            ))}
+                            {filteredPatients.length > 0 ? (
+                                filteredPatients.map((p) => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => setSelectedPatient(p.id)}
+                                        className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors border ${selectedPatient === p.id
+                                            ? "bg-blue-600/10 border-blue-500/30"
+                                            : "bg-white/5 border-transparent hover:bg-white/10"
+                                            }`}
+                                    >
+                                        <div>
+                                            <div className={`font-medium ${selectedPatient === p.id ? "text-blue-400" : "text-gray-200"}`}>{p.name}</div>
+                                            <div className="text-xs text-gray-500">Last: {p.lastVisit || "—"}</div>
+                                        </div>
+                                        {selectedPatient === p.id && <CheckCircle size={16} className="text-blue-500" />}
+                                    </button>
+                                ))
+                            ) : (
+                                <div className="text-center py-6 text-gray-500 text-sm">
+                                    {patients.length === 0 ? "No patients yet. They appear after booking appointments." : "No matching patients."}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -113,12 +178,12 @@ export default function PrescriptionsPage() {
                                 </div>
                                 <div>
                                     <h2 className="text-lg font-bold">New Prescription</h2>
-                                    <p className="text-sm text-gray-400">ID: #RX-2026-8821</p>
+                                    <p className="text-sm text-gray-400">ID: #{prescriptionNumber}</p>
                                 </div>
                             </div>
                             <div className="text-right">
                                 <div className="text-sm font-medium text-gray-300">Date</div>
-                                <div className="text-sm text-gray-500">Feb 14, 2026</div>
+                                <div className="text-sm text-gray-500">{todayDate}</div>
                             </div>
                         </div>
 
@@ -210,15 +275,19 @@ export default function PrescriptionsPage() {
                                     animate={{ opacity: 1, scale: 1 }}
                                     className="px-6 py-3 bg-green-500/20 text-green-400 rounded-xl flex items-center gap-2 font-medium border border-green-500/50"
                                 >
-                                    <CheckCircle size={20} /> Prescription Sent
+                                    <CheckCircle size={20} /> Prescription Sent & Saved
                                 </motion.div>
                             ) : (
                                 <button
                                     onClick={handleSend}
-                                    disabled={!selectedPatient}
+                                    disabled={!selectedPatient || isSending}
                                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl flex items-center gap-2 font-medium transition-all shadow-lg shadow-blue-900/20"
                                 >
-                                    <Send size={18} /> Sign & Send Prescription
+                                    {isSending ? (
+                                        <><Loader2 size={18} className="animate-spin" /> Saving...</>
+                                    ) : (
+                                        <><Send size={18} /> Sign & Send Prescription</>
+                                    )}
                                 </button>
                             )}
                         </div>

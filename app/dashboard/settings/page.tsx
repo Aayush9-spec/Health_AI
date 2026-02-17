@@ -1,9 +1,10 @@
 "use client";
 
-import { User, Bell, Lock, Shield, Smartphone, Globe, ToggleLeft, ToggleRight, LogOut, Save } from "lucide-react";
-import { useState } from "react";
+import { User, Bell, Lock, Shield, Smartphone, Globe, ToggleLeft, ToggleRight, LogOut, Save, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
+import { getProfile, updateProfile, getCurrentUserId } from "@/lib/supabase-helpers";
 
 export default function SettingsPage() {
     const [medicalShare, setMedicalShare] = useState(true);
@@ -11,7 +12,34 @@ export default function SettingsPage() {
     const [faceId, setFaceId] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [fullName, setFullName] = useState("");
+    const [email, setEmail] = useState("");
+    const [phone, setPhone] = useState("");
+    const [medicalId, setMedicalId] = useState("Auto-generated on signup");
     const router = useRouter();
+
+    // Load profile on mount
+    useEffect(() => {
+        async function loadProfile() {
+            const userId = await getCurrentUserId();
+            if (!userId) {
+                setLoading(false);
+                return;
+            }
+            const profile = await getProfile(userId);
+            if (profile) {
+                setFullName(profile.full_name || "");
+                setEmail(profile.email || "");
+                setPhone(profile.phone || "");
+                setMedicalShare(profile.medical_share);
+                setNotifications(profile.notifications);
+                setMedicalId(userId.slice(0, 8).toUpperCase());
+            }
+            setLoading(false);
+        }
+        loadProfile();
+    }, []);
 
     const handleSignOut = async () => {
         const supabase = createClient();
@@ -23,12 +51,28 @@ export default function SettingsPage() {
     const handleSaveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setSaving(true);
-        // Simulate save — in production, write to Supabase profiles table
-        await new Promise((r) => setTimeout(r, 800));
+        const userId = await getCurrentUserId();
+        if (userId) {
+            await updateProfile(userId, {
+                full_name: fullName,
+                email,
+                phone,
+                medical_share: medicalShare,
+                notifications,
+            });
+        }
         setSaving(false);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
     };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="animate-spin text-purple-500" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 max-w-4xl">
@@ -58,7 +102,8 @@ export default function SettingsPage() {
                         <input
                             type="text"
                             name="fullName"
-                            defaultValue=""
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
                             placeholder="Enter your full name"
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500/50"
                         />
@@ -67,7 +112,7 @@ export default function SettingsPage() {
                         <label className="text-sm text-gray-400">Medical ID</label>
                         <input
                             type="text"
-                            value="Auto-generated on signup"
+                            value={medicalId}
                             readOnly
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-gray-500 cursor-not-allowed"
                         />
@@ -77,7 +122,8 @@ export default function SettingsPage() {
                         <input
                             type="email"
                             name="email"
-                            defaultValue=""
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             placeholder="your@email.com"
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500/50"
                         />
@@ -87,7 +133,8 @@ export default function SettingsPage() {
                         <input
                             type="tel"
                             name="phone"
-                            defaultValue=""
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
                             placeholder="+91 12345 67890"
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500/50"
                         />

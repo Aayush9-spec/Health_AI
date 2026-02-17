@@ -1,50 +1,57 @@
 "use client";
 
-import { Calendar, Clock, MapPin, Video, CheckCircle, X, Plus, Search } from "lucide-react";
-import { useState } from "react";
+import { Calendar, Clock, MapPin, Video, CheckCircle, X, Plus, Search, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-
-const doctors = [
-    {
-        id: 1,
-        name: "Dr. Sarah Chen",
-        specialty: "General Physician",
-        location: "Online Meeting",
-        time: "10:00 AM - 11:00 AM",
-        date: "Today, Feb 15",
-        image: "bg-blue-500",
-        type: "online",
-        meetLink: "https://meet.google.com/med-ai-consult",
-    },
-    {
-        id: 2,
-        name: "Dr. Michael Ross",
-        specialty: "Neurologist",
-        location: "Neuro Clinic, Downtown",
-        time: "02:00 PM - 03:00 PM",
-        date: "Tomorrow, Feb 16",
-        image: "bg-purple-500",
-        type: "offline",
-        meetLink: null,
-    },
-];
-
-const availableDoctors = [
-    { id: 10, name: "Dr. Emily Park", specialty: "Cardiologist" },
-    { id: 11, name: "Dr. James Liu", specialty: "Dermatologist" },
-    { id: 12, name: "Dr. Sarah Chen", specialty: "General Physician" },
-];
+import {
+    getDoctors,
+    getAppointments,
+    bookAppointment,
+    rescheduleAppointment,
+    getCurrentUserId,
+    type Doctor,
+    type Appointment,
+} from "@/lib/supabase-helpers";
 
 export default function AppointmentsPage() {
     const [activeTab, setActiveTab] = useState("upcoming");
     const [showBooking, setShowBooking] = useState(false);
-    const [rescheduleId, setRescheduleId] = useState<number | null>(null);
+    const [rescheduleId, setRescheduleId] = useState<string | null>(null);
     const [rescheduleDate, setRescheduleDate] = useState("");
     const [bookingSuccess, setBookingSuccess] = useState(false);
-    const [selectedDoctor, setSelectedDoctor] = useState<number | null>(null);
+    const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
     const [bookingDate, setBookingDate] = useState("");
     const [bookingTime, setBookingTime] = useState("");
+    const [loading, setLoading] = useState(true);
+    const [booking, setBooking] = useState(false);
+
+    const [doctors, setDoctors] = useState<Doctor[]>([]);
+    const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
+    const [pastAppointments, setPastAppointments] = useState<Appointment[]>([]);
+
+    // Load data on mount
+    useEffect(() => {
+        async function loadData() {
+            const userId = await getCurrentUserId();
+            if (!userId) {
+                setLoading(false);
+                return;
+            }
+
+            const [allDoctors, upcoming, past] = await Promise.all([
+                getDoctors(),
+                getAppointments(userId, "upcoming"),
+                getAppointments(userId, "completed"),
+            ]);
+
+            setDoctors(allDoctors);
+            setUpcomingAppointments(upcoming);
+            setPastAppointments(past);
+            setLoading(false);
+        }
+        loadData();
+    }, []);
 
     const handleJoinMeet = (meetLink: string | null) => {
         if (meetLink) {
@@ -52,28 +59,73 @@ export default function AppointmentsPage() {
         }
     };
 
-    const handleReschedule = (id: number) => {
+    const handleReschedule = (id: string) => {
         setRescheduleId(id);
     };
 
-    const confirmReschedule = () => {
-        // In production: update Supabase appointment row
+    const confirmReschedule = async () => {
+        if (!rescheduleId || !rescheduleDate) return;
+        const success = await rescheduleAppointment(rescheduleId, rescheduleDate);
+        if (success) {
+            // Update local state
+            setUpcomingAppointments((prev) =>
+                prev.map((a) => (a.id === rescheduleId ? { ...a, date: rescheduleDate } : a))
+            );
+        }
         setRescheduleId(null);
         setRescheduleDate("");
     };
 
-    const handleBook = () => {
+    const handleBook = async () => {
         if (!selectedDoctor || !bookingDate || !bookingTime) return;
-        // In production: insert into Supabase appointments table
-        setBookingSuccess(true);
-        setTimeout(() => {
-            setShowBooking(false);
-            setBookingSuccess(false);
-            setSelectedDoctor(null);
-            setBookingDate("");
-            setBookingTime("");
-        }, 2000);
+
+        setBooking(true);
+        const userId = await getCurrentUserId();
+        if (!userId) {
+            setBooking(false);
+            return;
+        }
+
+        const doctor = doctors.find((d) => d.id === selectedDoctor);
+        const success = await bookAppointment({
+            patient_id: userId,
+            doctor_id: selectedDoctor,
+            date: bookingDate,
+            time: bookingTime,
+            type: doctor?.meet_link ? "online" : "offline",
+            meet_link: doctor?.meet_link || undefined,
+        });
+
+        setBooking(false);
+
+        if (success) {
+            setBookingSuccess(true);
+            // Refresh appointments
+            const updated = await getAppointments(userId, "upcoming");
+            setUpcomingAppointments(updated);
+
+            setTimeout(() => {
+                setShowBooking(false);
+                setBookingSuccess(false);
+                setSelectedDoctor(null);
+                setBookingDate("");
+                setBookingTime("");
+            }, 2000);
+        }
     };
+
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr + "T00:00:00");
+        return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="animate-spin text-purple-500" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -111,7 +163,7 @@ export default function AppointmentsPage() {
                                 <div className="flex flex-col items-center py-8">
                                     <CheckCircle size={48} className="text-green-400 mb-4" />
                                     <h3 className="text-lg font-bold mb-1">Appointment Booked!</h3>
-                                    <p className="text-gray-400 text-sm">You'll receive a confirmation email shortly.</p>
+                                    <p className="text-gray-400 text-sm">You&apos;ll receive a confirmation email shortly.</p>
                                 </div>
                             ) : (
                                 <>
@@ -125,14 +177,14 @@ export default function AppointmentsPage() {
                                     <div className="space-y-4">
                                         <div className="space-y-2">
                                             <label className="text-sm text-gray-400">Select Doctor</label>
-                                            <div className="space-y-2">
-                                                {availableDoctors.map((doc) => (
+                                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                                {doctors.map((doc) => (
                                                     <button
                                                         key={doc.id}
                                                         onClick={() => setSelectedDoctor(doc.id)}
                                                         className={`w-full p-3 rounded-lg text-left transition-colors border text-sm ${selectedDoctor === doc.id
-                                                                ? "bg-purple-600/10 border-purple-500/30 text-purple-400"
-                                                                : "bg-white/5 border-transparent hover:bg-white/10"
+                                                            ? "bg-purple-600/10 border-purple-500/30 text-purple-400"
+                                                            : "bg-white/5 border-transparent hover:bg-white/10"
                                                             }`}
                                                     >
                                                         <div className="font-medium">{doc.name}</div>
@@ -164,10 +216,10 @@ export default function AppointmentsPage() {
 
                                         <button
                                             onClick={handleBook}
-                                            disabled={!selectedDoctor || !bookingDate || !bookingTime}
-                                            className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-colors"
+                                            disabled={!selectedDoctor || !bookingDate || !bookingTime || booking}
+                                            className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
                                         >
-                                            Confirm Booking
+                                            {booking ? <><Loader2 size={16} className="animate-spin" /> Booking...</> : "Confirm Booking"}
                                         </button>
                                     </div>
                                 </>
@@ -202,88 +254,123 @@ export default function AppointmentsPage() {
             {/* List */}
             <div className="grid gap-4">
                 {activeTab === "upcoming" ? (
-                    doctors.map((doc) => (
-                        <div
-                            key={doc.id}
-                            className="p-5 bg-white/[0.02] border border-white/10 rounded-xl hover:bg-white/[0.04] transition-colors flex flex-col md:flex-row gap-6 items-start md:items-center"
-                        >
-                            {/* Doctor Avatar */}
-                            <div className={`w-12 h-12 rounded-full ${doc.image} flex items-center justify-center text-white font-bold text-lg`}>
-                                {doc.name[0]}
-                            </div>
+                    upcomingAppointments.length > 0 ? (
+                        upcomingAppointments.map((apt) => (
+                            <div
+                                key={apt.id}
+                                className="p-5 bg-white/[0.02] border border-white/10 rounded-xl hover:bg-white/[0.04] transition-colors flex flex-col md:flex-row gap-6 items-start md:items-center"
+                            >
+                                {/* Doctor Avatar */}
+                                <div className={`w-12 h-12 rounded-full ${apt.doctor?.image_color || 'bg-blue-500'} flex items-center justify-center text-white font-bold text-lg`}>
+                                    {apt.doctor?.name?.[0] || "D"}
+                                </div>
 
-                            {/* Info */}
-                            <div className="flex-1 space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="font-semibold text-lg">{doc.name}</h3>
-                                    {doc.type === "online" && (
-                                        <span className="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-0.5 rounded-full border border-blue-500/20 uppercase font-medium tracking-wide">
-                                            Video Call
-                                        </span>
+                                {/* Info */}
+                                <div className="flex-1 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="font-semibold text-lg">{apt.doctor?.name || "Doctor"}</h3>
+                                        {apt.type === "online" && (
+                                            <span className="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-0.5 rounded-full border border-blue-500/20 uppercase font-medium tracking-wide">
+                                                Video Call
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <p className="text-gray-400 text-sm">{apt.doctor?.specialty}</p>
+
+                                    <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
+                                        <div className="flex items-center gap-1">
+                                            <MapPin size={12} /> {apt.doctor?.location || "Clinic"}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Clock size={12} /> {apt.time}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Calendar size={12} /> {formatDate(apt.date)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Status/Action */}
+                                <div className="flex items-center gap-3 w-full md:w-auto">
+                                    {apt.type === "online" ? (
+                                        <button
+                                            onClick={() => handleJoinMeet(apt.meet_link || apt.doctor?.meet_link || null)}
+                                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-500/20"
+                                        >
+                                            <Video size={16} /> Join Google Meet
+                                        </button>
+                                    ) : (
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-400 rounded-full text-xs font-medium border border-green-500/20">
+                                            <CheckCircle size={12} /> Appointment Confirmed
+                                        </div>
+                                    )}
+
+                                    {rescheduleId === apt.id ? (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="date"
+                                                value={rescheduleDate}
+                                                onChange={(e) => setRescheduleDate(e.target.value)}
+                                                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white [color-scheme:dark]"
+                                            />
+                                            <button
+                                                onClick={confirmReschedule}
+                                                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors"
+                                            >
+                                                OK
+                                            </button>
+                                            <button
+                                                onClick={() => setRescheduleId(null)}
+                                                className="text-gray-500 hover:text-white"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleReschedule(apt.id)}
+                                            className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-gray-400"
+                                        >
+                                            Reschedule
+                                        </button>
                                     )}
                                 </div>
-
-                                <p className="text-gray-400 text-sm">{doc.specialty}</p>
-
-                                <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
-                                    <div className="flex items-center gap-1">
-                                        <MapPin size={12} /> {doc.location}
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Clock size={12} /> {doc.time}
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-gray-500 text-center py-20">No upcoming appointments. Book one above!</div>
+                    )
+                ) : (
+                    pastAppointments.length > 0 ? (
+                        pastAppointments.map((apt) => (
+                            <div
+                                key={apt.id}
+                                className="p-5 bg-white/[0.02] border border-white/10 rounded-xl flex flex-col md:flex-row gap-6 items-start md:items-center opacity-70"
+                            >
+                                <div className={`w-12 h-12 rounded-full ${apt.doctor?.image_color || 'bg-gray-500'} flex items-center justify-center text-white font-bold text-lg`}>
+                                    {apt.doctor?.name?.[0] || "D"}
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                    <h3 className="font-semibold text-lg">{apt.doctor?.name || "Doctor"}</h3>
+                                    <p className="text-gray-400 text-sm">{apt.doctor?.specialty}</p>
+                                    <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
+                                        <div className="flex items-center gap-1">
+                                            <Calendar size={12} /> {formatDate(apt.date)}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Clock size={12} /> {apt.time}
+                                        </div>
                                     </div>
                                 </div>
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-500/10 text-gray-400 rounded-full text-xs font-medium border border-gray-500/20">
+                                    <CheckCircle size={12} /> Completed
+                                </div>
                             </div>
-
-                            {/* Status/Action */}
-                            <div className="flex items-center gap-3 w-full md:w-auto">
-                                {doc.type === "online" ? (
-                                    <button
-                                        onClick={() => handleJoinMeet(doc.meetLink)}
-                                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-500/20"
-                                    >
-                                        <Video size={16} /> Join Google Meet
-                                    </button>
-                                ) : (
-                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-400 rounded-full text-xs font-medium border border-green-500/20">
-                                        <CheckCircle size={12} /> Appointment Confirmed
-                                    </div>
-                                )}
-
-                                {rescheduleId === doc.id ? (
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="date"
-                                            value={rescheduleDate}
-                                            onChange={(e) => setRescheduleDate(e.target.value)}
-                                            className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white [color-scheme:dark]"
-                                        />
-                                        <button
-                                            onClick={confirmReschedule}
-                                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors"
-                                        >
-                                            OK
-                                        </button>
-                                        <button
-                                            onClick={() => setRescheduleId(null)}
-                                            className="text-gray-500 hover:text-white"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={() => handleReschedule(doc.id)}
-                                        className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-gray-400"
-                                    >
-                                        Reschedule
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    <div className="text-gray-500 text-center py-20">No past appointments found.</div>
+                        ))
+                    ) : (
+                        <div className="text-gray-500 text-center py-20">No past appointments found.</div>
+                    )
                 )}
             </div>
         </div>

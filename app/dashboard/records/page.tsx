@@ -1,33 +1,15 @@
 "use client";
 
 import { FileText, ShoppingBag, Truck, Scan, Pill, MapPin, Upload, CheckCircle, X, Loader2 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-
-const records = [
-    {
-        id: "REC-2026-001",
-        type: "Prescription",
-        doctor: "Dr. Sarah Chen",
-        date: "Feb 14, 2026",
-        diagnosis: "Viral Fever",
-        items: [
-            { name: "Paracetamol 650mg", dosage: "1-0-1 (3 days)", price: 0.002 },
-            { name: "Vitamin C Supplements", dosage: "0-1-0 (7 days)", price: 0.005 },
-        ],
-        status: "Pending Order",
-    },
-    {
-        id: "REC-2025-892",
-        type: "Report",
-        doctor: "Dr. Michael Ross",
-        date: "Dec 20, 2025",
-        diagnosis: "Regular Checkup",
-        items: [],
-        status: "Archived",
-    }
-];
+import {
+    getMedicalRecords,
+    updateRecordStatus,
+    getCurrentUserId,
+    type MedicalRecord,
+} from "@/lib/supabase-helpers";
 
 export default function MedicalRecordsPage() {
     const [activeTab, setActiveTab] = useState("prescriptions");
@@ -35,7 +17,24 @@ export default function MedicalRecordsPage() {
     const [scanResult, setScanResult] = useState<string | null>(null);
     const [scanLoading, setScanLoading] = useState(false);
     const [orderStatuses, setOrderStatuses] = useState<Record<string, string>>({});
+    const [records, setRecords] = useState<MedicalRecord[]>([]);
+    const [loading, setLoading] = useState(true);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Load records on mount
+    useEffect(() => {
+        async function loadRecords() {
+            const userId = await getCurrentUserId();
+            if (!userId) {
+                setLoading(false);
+                return;
+            }
+            const data = await getMedicalRecords(userId);
+            setRecords(data);
+            setLoading(false);
+        }
+        loadRecords();
+    }, []);
 
     const handleScanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -49,18 +48,38 @@ export default function MedicalRecordsPage() {
             `• Active Ingredient: Acetaminophen 650mg\n` +
             `• Batch: Valid (Exp: Dec 2027)\n` +
             `• Manufacturer: Verified Pharma Corp\n\n` +
-            `This medicine matches your prescription REC-2026-001.`
+            `This medicine matches your prescription.`
         );
         setScanLoading(false);
     };
 
-    const handleOrderMedicines = (recordId: string) => {
+    const handleOrderMedicines = async (recordId: string) => {
         setOrderStatuses((prev) => ({ ...prev, [recordId]: "processing" }));
-        // Simulate order processing
-        setTimeout(() => {
-            setOrderStatuses((prev) => ({ ...prev, [recordId]: "ordered" }));
-        }, 1500);
+        const success = await updateRecordStatus(recordId, "Ordered");
+        if (success) {
+            setTimeout(() => {
+                setOrderStatuses((prev) => ({ ...prev, [recordId]: "ordered" }));
+            }, 1000);
+        } else {
+            setOrderStatuses((prev) => ({ ...prev, [recordId]: "" }));
+        }
     };
+
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr + "T00:00:00");
+        return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    };
+
+    const pendingRecords = records.filter((r) => r.status === "Pending Order" || r.status === "Ordered");
+    const archivedRecords = records.filter((r) => r.status === "Archived" || r.status === "Delivered");
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="animate-spin text-purple-500" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -153,99 +172,126 @@ export default function MedicalRecordsPage() {
                             )}
                         </AnimatePresence>
 
-                        {records.map((rec) => (
-                            <div key={rec.id} className="bg-white/[0.02] border border-white/10 rounded-xl p-6 group">
-                                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
-                                    <div className="flex gap-4">
-                                        <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
-                                            <FileText size={24} />
+                        {pendingRecords.length > 0 ? (
+                            pendingRecords.map((rec) => (
+                                <div key={rec.id} className="bg-white/[0.02] border border-white/10 rounded-xl p-6 group">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+                                        <div className="flex gap-4">
+                                            <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
+                                                <FileText size={24} />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-semibold text-lg">{rec.diagnosis || "Medical Record"}</h3>
+                                                <p className="text-gray-400 text-sm">Prescribed by {rec.doctor?.name || "Doctor"}</p>
+                                                <p className="text-xs text-gray-500 mt-1">{formatDate(rec.date)} • {rec.record_number || rec.id.slice(0, 8)}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h3 className="font-semibold text-lg">{rec.diagnosis}</h3>
-                                            <p className="text-gray-400 text-sm">Prescribed by {rec.doctor}</p>
-                                            <p className="text-xs text-gray-500 mt-1">{rec.date} • {rec.id}</p>
-                                        </div>
-                                    </div>
-                                    <div className={`px-3 py-1 rounded-full text-xs font-medium border ${orderStatuses[rec.id] === "ordered"
+                                        <div className={`px-3 py-1 rounded-full text-xs font-medium border ${orderStatuses[rec.id] === "ordered" || rec.status === "Ordered"
                                             ? "bg-green-500/10 text-green-400 border-green-500/20"
                                             : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
-                                        }`}>
-                                        {orderStatuses[rec.id] === "ordered" ? "Ordered ✓" : rec.status}
+                                            }`}>
+                                            {orderStatuses[rec.id] === "ordered" || rec.status === "Ordered" ? "Ordered ✓" : rec.status}
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Medicines List */}
-                                {rec.items.length > 0 && (
-                                    <div className="space-y-3 mb-6">
-                                        {rec.items.map((item, i) => (
-                                            <div key={i} className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
-                                                <div className="flex items-center gap-3">
-                                                    <Pill size={16} className="text-gray-400" />
-                                                    <div>
-                                                        <div className="text-sm font-medium">{item.name}</div>
-                                                        <div className="text-xs text-gray-500">{item.dosage}</div>
+                                    {/* Medicines List */}
+                                    {rec.record_items && rec.record_items.length > 0 && (
+                                        <div className="space-y-3 mb-6">
+                                            {rec.record_items.map((item) => (
+                                                <div key={item.id} className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                                                    <div className="flex items-center gap-3">
+                                                        <Pill size={16} className="text-gray-400" />
+                                                        <div>
+                                                            <div className="text-sm font-medium">{item.name}</div>
+                                                            <div className="text-xs text-gray-500">{item.dosage}</div>
+                                                        </div>
                                                     </div>
+                                                    <div className="font-mono text-sm text-gray-300">{item.price} ETH</div>
                                                 </div>
-                                                <div className="font-mono text-sm text-gray-300">{item.price} ETH</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                            ))}
+                                        </div>
+                                    )}
 
-                                {/* Action: Order Online */}
-                                {rec.status === "Pending Order" && !orderStatuses[rec.id] && (
-                                    <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-white/5">
-                                        <button
-                                            onClick={() => handleOrderMedicines(rec.id)}
-                                            className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2 transition-colors"
-                                        >
-                                            <ShoppingBag size={18} /> Order Medicines
-                                        </button>
-                                        <Link
-                                            href="/dashboard/diagnostics"
-                                            className="px-6 py-2.5 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-medium text-gray-300 border border-white/10 text-center"
-                                        >
-                                            View Diagnostics
-                                        </Link>
-                                    </div>
-                                )}
+                                    {/* Action: Order Online */}
+                                    {rec.status === "Pending Order" && !orderStatuses[rec.id] && (
+                                        <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-white/5">
+                                            <button
+                                                onClick={() => handleOrderMedicines(rec.id)}
+                                                className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2 transition-colors"
+                                            >
+                                                <ShoppingBag size={18} /> Order Medicines
+                                            </button>
+                                            <Link
+                                                href="/dashboard/diagnostics"
+                                                className="px-6 py-2.5 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-medium text-gray-300 border border-white/10 text-center"
+                                            >
+                                                View Diagnostics
+                                            </Link>
+                                        </div>
+                                    )}
 
-                                {orderStatuses[rec.id] === "processing" && (
-                                    <div className="flex items-center justify-center gap-2 pt-4 border-t border-white/5 text-purple-400">
-                                        <Loader2 size={16} className="animate-spin" />
-                                        <span className="text-sm">Processing order...</span>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                                    {orderStatuses[rec.id] === "processing" && (
+                                        <div className="flex items-center justify-center gap-2 pt-4 border-t border-white/5 text-purple-400">
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span className="text-sm">Processing order...</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-gray-500 text-center py-20">No prescriptions found. They will appear here when a doctor writes one for you.</div>
+                        )}
                     </>
                 )}
 
                 {activeTab === "orders" && (
-                    <div className="bg-white/[0.02] border border-white/10 rounded-xl p-6">
-                        <div className="flex gap-4 items-center mb-6">
-                            <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-400">
-                                <Truck size={20} />
-                            </div>
-                            <div>
-                                <h3 className="font-medium">Order #DLV-9921</h3>
-                                <p className="text-xs text-gray-500">Arriving in 25 mins • Delivery Partner: Dunzo</p>
-                            </div>
-                        </div>
+                    records.filter((r) => r.status === "Ordered").length > 0 ? (
+                        records.filter((r) => r.status === "Ordered").map((rec) => (
+                            <div key={rec.id} className="bg-white/[0.02] border border-white/10 rounded-xl p-6">
+                                <div className="flex gap-4 items-center mb-6">
+                                    <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-400">
+                                        <Truck size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-medium">Order #{rec.record_number || rec.id.slice(0, 8)}</h3>
+                                        <p className="text-xs text-gray-500">{rec.diagnosis} • {formatDate(rec.date)}</p>
+                                    </div>
+                                </div>
 
-                        {/* Track */}
-                        <div className="h-32 w-full bg-white/5 rounded-lg border border-white/10 flex items-center justify-center relative overflow-hidden">
-                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(168,85,247,0.2),transparent_50%)]"></div>
-                            <div className="flex items-center gap-2 text-gray-400 text-sm">
-                                <MapPin size={16} className="text-purple-500 animate-bounce" />
-                                Tracking Live
+                                {/* Track */}
+                                <div className="h-32 w-full bg-white/5 rounded-lg border border-white/10 flex items-center justify-center relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(168,85,247,0.2),transparent_50%)]"></div>
+                                    <div className="flex items-center gap-2 text-gray-400 text-sm">
+                                        <MapPin size={16} className="text-purple-500 animate-bounce" />
+                                        Tracking Live
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        ))
+                    ) : (
+                        <div className="text-gray-500 text-center py-20">No active orders.</div>
+                    )
                 )}
 
                 {activeTab === "history" && (
-                    <div className="text-gray-500 text-center py-20">No historical records found.</div>
+                    archivedRecords.length > 0 ? (
+                        archivedRecords.map((rec) => (
+                            <div key={rec.id} className="bg-white/[0.02] border border-white/10 rounded-xl p-6 opacity-70">
+                                <div className="flex gap-4">
+                                    <div className="w-12 h-12 rounded-lg bg-gray-500/10 flex items-center justify-center text-gray-400">
+                                        <FileText size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold">{rec.diagnosis || "Medical Record"}</h3>
+                                        <p className="text-gray-400 text-sm">By {rec.doctor?.name || "Doctor"}</p>
+                                        <p className="text-xs text-gray-500 mt-1">{formatDate(rec.date)} • {rec.record_number || rec.id.slice(0, 8)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-gray-500 text-center py-20">No historical records found.</div>
+                    )
                 )}
             </div>
         </div>
