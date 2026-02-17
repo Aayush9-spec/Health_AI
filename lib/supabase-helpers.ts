@@ -24,6 +24,10 @@ export interface Doctor {
     meet_link: string | null;
     image_color: string;
     available: boolean;
+    bio?: string;
+    consultation_fee?: number;
+    experience?: number;
+    phone?: string;
 }
 
 export interface Appointment {
@@ -155,6 +159,40 @@ export async function getDoctors(): Promise<Doctor[]> {
     return data ?? [];
 }
 
+export async function getDoctorProfile(userId: string): Promise<Doctor | null> {
+    const supabase = createClient();
+    const { data, error } = await supabase
+        .from("doctors")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
+
+    if (error) {
+        // It's possible the user is a doctor but doesn't have a profile yet? 
+        // Or if RLS is strict. But doctors should have one created?
+        // Maybe return null and handle creation if needed.
+        return null;
+    }
+    return data;
+}
+
+export async function updateDoctorProfile(
+    userId: string,
+    updates: Partial<Doctor>
+): Promise<boolean> {
+    const supabase = createClient();
+    const { error } = await supabase
+        .from("doctors")
+        .update(updates)
+        .eq("user_id", userId);
+
+    if (error) {
+        console.error("Error updating doctor profile:", error.message);
+        return false;
+    }
+    return true;
+}
+
 // ─── Appointments ───────────────────────────────────────────────────
 
 export async function getAppointments(
@@ -188,11 +226,17 @@ export async function bookAppointment(appointment: {
     time: string;
     type: "online" | "offline";
     meet_link?: string;
+    payment_status?: string;
+    payment_id?: string;
+    order_id?: string;
+    amount?: number;
 }): Promise<boolean> {
     const supabase = createClient();
     const { error } = await supabase.from("appointments").insert({
         ...appointment,
         status: "upcoming",
+        payment_status: appointment.payment_status || "pending",
+        amount: appointment.amount || 0,
     });
 
     if (error) {

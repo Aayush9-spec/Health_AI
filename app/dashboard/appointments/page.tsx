@@ -4,6 +4,7 @@ import { Calendar, Clock, MapPin, Video, CheckCircle, X, Plus, Search, Loader2 }
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import Script from "next/script";
 import { useRealtimeSubscription } from "@/lib/use-realtime";
 import {
     getDoctors,
@@ -12,6 +13,7 @@ import {
     rescheduleAppointment,
     cancelAppointment,
     getCurrentUserId,
+    getProfile,
     type Doctor,
     type Appointment,
 } from "@/lib/supabase-helpers";
@@ -28,6 +30,7 @@ export default function AppointmentsPage() {
     const [loading, setLoading] = useState(true);
     const [booking, setBooking] = useState(false);
     const [cancelling, setCancelling] = useState<string | null>(null);
+    const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
@@ -112,21 +115,80 @@ export default function AppointmentsPage() {
             return;
         }
 
-        const doctor = doctors.find((d) => d.id === selectedDoctor);
+        const [doctor, profile] = await Promise.all([
+            doctors.find((d) => d.id === selectedDoctor),
+            getProfile(userId)
+        ]);
+
+        const fee = doctor?.consultation_fee || 0;
+
+        // If fee > 0, initiate Razorpay
+        if (fee > 0 && razorpayLoaded) {
+            try {
+                // 1. Create Order
+                const res = await fetch("/api/create-order", {
+                    method: "POST",
+                    body: JSON.stringify({ amount: fee, currency: "INR" }),
+                });
+                const order = await res.json();
+
+                if (!order.id) throw new Error("Order creation failed");
+
+                // 2. Open Razorpay
+                const options = {
+                    key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_placeholder", // Replace with env var
+                    amount: order.amount,
+                    currency: order.currency,
+                    name: "MedAI Platform",
+                    description: `Consultation with ${doctor?.name}`,
+                    order_id: order.id,
+                    handler: async (response: any) => {
+                        // 3. On Success, book appointment with payment details
+                        await completeBooking(userId, doctor, response.razorpay_payment_id, response.razorpay_order_id, fee);
+                    },
+                    prefill: {
+                        name: profile?.full_name || "Patient",
+                        contact: profile?.phone || "",
+                        email: profile?.email || "",
+                    },
+                    theme: {
+                        color: "#9333ea",
+                    },
+                };
+
+                const rzp = new (window as any).Razorpay(options);
+                rzp.open();
+                setBooking(false); // Modal stays open until payment completes
+            } catch (err) {
+                console.error("Payment failed", err);
+                setBooking(false);
+                alert("Payment initiation failed. Please try again.");
+            }
+        } else {
+            // Free consultation or offline
+            await completeBooking(userId, doctor);
+        }
+    };
+
+    const completeBooking = async (userId: string, doctor: any, paymentId?: string, orderId?: string, amount?: number) => {
+        setBooking(true);
         const success = await bookAppointment({
             patient_id: userId,
-            doctor_id: selectedDoctor,
+            doctor_id: selectedDoctor!,
             date: bookingDate,
             time: bookingTime,
             type: doctor?.meet_link ? "online" : "offline",
             meet_link: doctor?.meet_link || undefined,
+            payment_status: paymentId ? "paid" : "pending",
+            payment_id: paymentId,
+            order_id: orderId,
+            amount: amount,
         });
 
         setBooking(false);
 
         if (success) {
             setBookingSuccess(true);
-            // Refresh appointments
             const updated = await getAppointments(userId, "upcoming");
             setUpcomingAppointments(updated);
 
@@ -160,6 +222,10 @@ export default function AppointmentsPage() {
                     <h1 className="text-2xl font-bold mb-1">Appointments</h1>
                     <p className="text-gray-400 text-sm">Manage your scheduled visits</p>
                 </div>
+                <Script
+                    src="https://checkout.razorpay.com/v1/checkout.js"
+                    onLoad={() => setRazorpayLoaded(true)}
+                />
                 <button
                     onClick={() => setShowBooking(true)}
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 self-start sm:self-auto"
@@ -213,8 +279,20 @@ export default function AppointmentsPage() {
                                                             : "bg-white/5 border-transparent hover:bg-white/10"
                                                             }`}
                                                     >
-                                                        <div className="font-medium">{doc.name}</div>
-                                                        <div className="text-xs text-gray-500">{doc.specialty}</div>
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <div className="font-medium">{doc.name}</div>
+                                                                <div className="text-xs text-gray-500">{doc.specialty}</div>
+                                                            </div>
+                                                            {doc.consultation_fee && doc.consultation_fee > 0 && (
+                                                                <div className="text-xs font-bold text-green-400 bg-green-400/10 px-2 py-1 rounded">
+                                                                    ₹{doc.consultation_fee}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {doc.bio && selectedDoctor === doc.id && (
+                                                            <div className="mt-2 text-xs text-gray-400 line-clamp-2">{doc.bio}</div>
+                                                        )}
                                                     </button>
                                                 ))}
                                             </div>
@@ -245,7 +323,13 @@ export default function AppointmentsPage() {
                                             disabled={!selectedDoctor || !bookingDate || !bookingTime || booking}
                                             className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
                                         >
-                                            {booking ? <><Loader2 size={16} className="animate-spin" /> Booking...</> : "Confirm Booking"}
+                                            {booking ? (
+                                                <><Loader2 size={16} className="animate-spin" /> Processing...</>
+                                            ) : (
+                                                doctors.find(d => d.id === selectedDoctor)?.consultation_fee ?
+                                                    `Pay ₹${doctors.find(d => d.id === selectedDoctor)?.consultation_fee} & Book` :
+                                                    "Confirm Booking"
+                                            )}
                                         </button>
                                     </div>
                                 </>
