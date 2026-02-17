@@ -11,17 +11,20 @@ import {
     Settings,
     LogOut,
     Menu,
-    X
+    X,
+    Bell
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
+import { getCurrentUserId, getUnreadCount, getProfile } from "@/lib/supabase-helpers";
 
 const sidebarItems = [
     { icon: <MessageSquare size={20} />, label: "Health Assistant", href: "/dashboard" },
     { icon: <Calendar size={20} />, label: "Appointments", href: "/dashboard/appointments" },
     { icon: <FileText size={20} />, label: "Medical Records", href: "/dashboard/records" },
     { icon: <Activity size={20} />, label: "Diagnostics", href: "/dashboard/diagnostics" },
+    { icon: <Bell size={20} />, label: "Notifications", href: "/dashboard/notifications", hasBadge: true },
     { icon: <Wallet size={20} />, label: "Web3 Wallet", href: "/dashboard/wallet" },
     { icon: <Settings size={20} />, label: "Settings", href: "/dashboard/settings" },
 ];
@@ -30,6 +33,38 @@ export default function DashboardSidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
+    const [unread, setUnread] = useState(0);
+    const [userName, setUserName] = useState("Patient");
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        const load = async () => {
+            const userId = await getCurrentUserId();
+            if (!userId) return;
+
+            const [count, profile] = await Promise.all([
+                getUnreadCount(userId),
+                getProfile(userId),
+            ]);
+            setUnread(count);
+            if (profile) {
+                setUserName(profile.full_name || "Patient");
+                setAvatarUrl(profile.avatar_url);
+            }
+        };
+        load();
+
+        // Poll unread count every 30s
+        const interval = setInterval(async () => {
+            const userId = await getCurrentUserId();
+            if (userId) {
+                const count = await getUnreadCount(userId);
+                setUnread(count);
+            }
+        }, 30000);
+
+        return () => clearInterval(interval);
+    }, []);
 
     const handleSignOut = async () => {
         const supabase = createClient();
@@ -72,13 +107,18 @@ export default function DashboardSidebar() {
                                         key={item.href}
                                         href={item.href}
                                         onClick={() => setIsOpen(false)}
-                                        className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${isActive
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all relative ${isActive
                                             ? "bg-purple-600/10 text-purple-400 border border-purple-600/20"
                                             : "text-gray-400 hover:text-white hover:bg-white/5"
                                             }`}
                                     >
                                         {item.icon}
                                         {item.label}
+                                        {item.hasBadge && unread > 0 && (
+                                            <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-purple-600 text-white rounded-full min-w-[18px] text-center leading-tight">
+                                                {unread > 9 ? "9+" : unread}
+                                            </span>
+                                        )}
                                     </Link>
                                 );
                             })}
@@ -90,9 +130,15 @@ export default function DashboardSidebar() {
                                 onClick={handleSignOut}
                                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
                             >
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500" />
+                                {avatarUrl ? (
+                                    <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                ) : (
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white">
+                                        {userName.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
                                 <div className="flex-1 min-w-0 text-left">
-                                    <p className="text-sm font-medium text-white truncate">Patient</p>
+                                    <p className="text-sm font-medium text-white truncate">{userName}</p>
                                     <p className="text-xs text-gray-500 truncate">Sign Out</p>
                                 </div>
                                 <LogOut size={18} />
