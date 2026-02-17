@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, ShoppingBag, Truck, Scan, Pill, MapPin, Upload, CheckCircle, X, Loader2 } from "lucide-react";
+import { FileText, ShoppingBag, Truck, Scan, Pill, MapPin, Upload, CheckCircle, X, Loader2, Download } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -10,6 +10,7 @@ import {
     getCurrentUserId,
     type MedicalRecord,
 } from "@/lib/supabase-helpers";
+import { uploadMedicalDocument, getUserDocuments, getDocumentUrl } from "@/lib/supabase-storage";
 
 export default function MedicalRecordsPage() {
     const [activeTab, setActiveTab] = useState("prescriptions");
@@ -19,9 +20,11 @@ export default function MedicalRecordsPage() {
     const [orderStatuses, setOrderStatuses] = useState<Record<string, string>>({});
     const [records, setRecords] = useState<MedicalRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [docs, setDocs] = useState<{ name: string; path: string; size: number; created: string }[]>([]);
+    const [docUploading, setDocUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const docInputRef = useRef<HTMLInputElement>(null);
 
-    // Load records on mount
     useEffect(() => {
         async function loadRecords() {
             const userId = await getCurrentUserId();
@@ -29,8 +32,12 @@ export default function MedicalRecordsPage() {
                 setLoading(false);
                 return;
             }
-            const data = await getMedicalRecords(userId);
+            const [data, userDocs] = await Promise.all([
+                getMedicalRecords(userId),
+                getUserDocuments(userId),
+            ]);
             setRecords(data);
+            setDocs(userDocs);
             setLoading(false);
         }
         loadRecords();
@@ -295,24 +302,92 @@ export default function MedicalRecordsPage() {
                 )}
 
                 {activeTab === "history" && (
-                    archivedRecords.length > 0 ? (
-                        archivedRecords.map((rec) => (
-                            <div key={rec.id} className="bg-white/[0.02] border border-white/10 rounded-xl p-6 opacity-70">
-                                <div className="flex gap-4">
-                                    <div className="w-12 h-12 rounded-lg bg-gray-500/10 flex items-center justify-center text-gray-400">
-                                        <FileText size={24} />
+                    <>
+                        {/* Document Upload */}
+                        <div className="bg-white/[0.02] border border-dashed border-white/10 rounded-xl p-6">
+                            <input
+                                ref={docInputRef}
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                className="hidden"
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    setDocUploading(true);
+                                    const userId = await getCurrentUserId();
+                                    if (userId) {
+                                        await uploadMedicalDocument(userId, file);
+                                        const updated = await getUserDocuments(userId);
+                                        setDocs(updated);
+                                    }
+                                    setDocUploading(false);
+                                }}
+                            />
+                            <button
+                                onClick={() => docInputRef.current?.click()}
+                                disabled={docUploading}
+                                className="w-full flex flex-col items-center justify-center py-6 cursor-pointer"
+                            >
+                                {docUploading ? (
+                                    <Loader2 size={28} className="text-purple-400 animate-spin mb-2" />
+                                ) : (
+                                    <Upload size={28} className="text-purple-400 mb-2" />
+                                )}
+                                <p className="text-sm font-medium text-gray-300">Upload Medical Document</p>
+                                <p className="text-xs text-gray-600 mt-1">PDF, images, or Word documents</p>
+                            </button>
+                        </div>
+
+                        {/* Uploaded Documents */}
+                        {docs.length > 0 && (
+                            <div className="space-y-2">
+                                <h3 className="text-sm font-medium text-gray-400 px-1">Uploaded Documents</h3>
+                                {docs.map((doc) => (
+                                    <div key={doc.path} className="bg-white/[0.02] border border-white/10 rounded-xl p-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400">
+                                                <FileText size={18} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-200 truncate max-w-[200px]">{doc.name}</p>
+                                                <p className="text-xs text-gray-500">{doc.created ? new Date(doc.created).toLocaleDateString() : ""}</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                const url = await getDocumentUrl(doc.path);
+                                                if (url) window.open(url, "_blank");
+                                            }}
+                                            className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                            title="Download"
+                                        >
+                                            <Download size={16} />
+                                        </button>
                                     </div>
-                                    <div>
-                                        <h3 className="font-semibold">{rec.diagnosis || "Medical Record"}</h3>
-                                        <p className="text-gray-400 text-sm">By {rec.doctor?.name || "Doctor"}</p>
-                                        <p className="text-xs text-gray-500 mt-1">{formatDate(rec.date)} • {rec.record_number || rec.id.slice(0, 8)}</p>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Archived Records */}
+                        {archivedRecords.length > 0 ? (
+                            archivedRecords.map((rec) => (
+                                <div key={rec.id} className="bg-white/[0.02] border border-white/10 rounded-xl p-6 opacity-70">
+                                    <div className="flex gap-4">
+                                        <div className="w-12 h-12 rounded-lg bg-gray-500/10 flex items-center justify-center text-gray-400">
+                                            <FileText size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-semibold">{rec.diagnosis || "Medical Record"}</h3>
+                                            <p className="text-gray-400 text-sm">By {rec.doctor?.name || "Doctor"}</p>
+                                            <p className="text-xs text-gray-500 mt-1">{formatDate(rec.date)} • {rec.record_number || rec.id.slice(0, 8)}</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="text-gray-500 text-center py-20">No historical records found.</div>
-                    )
+                            ))
+                        ) : (
+                            docs.length === 0 && <div className="text-gray-500 text-center py-10">No historical records found.</div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

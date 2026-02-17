@@ -1,10 +1,11 @@
 "use client";
 
-import { User, Bell, Lock, Shield, Smartphone, Globe, ToggleLeft, ToggleRight, LogOut, Save, Loader2 } from "lucide-react";
+import { User, Bell, Lock, Shield, Smartphone, Globe, ToggleLeft, ToggleRight, LogOut, Save, Loader2, Camera } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { getProfile, updateProfile, getCurrentUserId } from "@/lib/supabase-helpers";
+import { uploadAvatar } from "@/lib/supabase-storage";
 
 export default function SettingsPage() {
     const [medicalShare, setMedicalShare] = useState(true);
@@ -17,6 +18,8 @@ export default function SettingsPage() {
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
     const [medicalId, setMedicalId] = useState("Auto-generated on signup");
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [avatarLoading, setAvatarLoading] = useState(false);
     const router = useRouter();
 
     // Load profile on mount
@@ -35,6 +38,7 @@ export default function SettingsPage() {
                 setMedicalShare(profile.medical_share);
                 setNotifications(profile.notifications);
                 setMedicalId(userId.slice(0, 8).toUpperCase());
+                setAvatarUrl(profile.avatar_url || null);
             }
             setLoading(false);
         }
@@ -95,6 +99,42 @@ export default function SettingsPage() {
                         <Save size={14} />
                         {saving ? "Saving..." : saved ? "Saved ✓" : "Save Changes"}
                     </button>
+                </div>
+
+                {/* Avatar Upload */}
+                <div className="flex items-center gap-6 mb-6 pb-6 border-b border-white/10">
+                    <label className="relative cursor-pointer group">
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setAvatarLoading(true);
+                                const userId = await getCurrentUserId();
+                                if (userId) {
+                                    const url = await uploadAvatar(userId, file);
+                                    if (url) setAvatarUrl(url + "?t=" + Date.now());
+                                }
+                                setAvatarLoading(false);
+                            }}
+                        />
+                        <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center overflow-hidden relative">
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-2xl font-bold text-white">{fullName ? fullName.charAt(0).toUpperCase() : "U"}</span>
+                            )}
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                {avatarLoading ? <Loader2 size={20} className="animate-spin text-white" /> : <Camera size={20} className="text-white" />}
+                            </div>
+                        </div>
+                    </label>
+                    <div>
+                        <p className="text-sm font-medium text-gray-200">Profile Photo</p>
+                        <p className="text-xs text-gray-500 mt-1">Click to upload (PNG, JPG up to 2 MB)</p>
+                    </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
