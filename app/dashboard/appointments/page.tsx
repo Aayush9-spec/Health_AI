@@ -1,9 +1,10 @@
 "use client";
 
 import { Calendar, Clock, MapPin, Video, CheckCircle, X, Plus, Search, Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useRealtimeSubscription } from "@/lib/use-realtime";
 import {
     getDoctors,
     getAppointments,
@@ -31,20 +32,34 @@ export default function AppointmentsPage() {
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
     const [pastAppointments, setPastAppointments] = useState<Appointment[]>([]);
+    const [userId, setUserId] = useState<string | null>(null);
+
+    const refreshAppointments = useCallback(async () => {
+        if (!userId) return;
+        const [upcoming, past] = await Promise.all([
+            getAppointments(userId, "upcoming"),
+            getAppointments(userId, "completed"),
+        ]);
+        setUpcomingAppointments(upcoming);
+        setPastAppointments(past);
+    }, [userId]);
+
+    useRealtimeSubscription("appointments", "patient_id", userId, refreshAppointments);
 
     // Load data on mount
     useEffect(() => {
         async function loadData() {
-            const userId = await getCurrentUserId();
-            if (!userId) {
+            const uid = await getCurrentUserId();
+            if (!uid) {
                 setLoading(false);
                 return;
             }
+            setUserId(uid);
 
             const [allDoctors, upcoming, past] = await Promise.all([
                 getDoctors(),
-                getAppointments(userId, "upcoming"),
-                getAppointments(userId, "completed"),
+                getAppointments(uid, "upcoming"),
+                getAppointments(uid, "completed"),
             ]);
 
             setDoctors(allDoctors);

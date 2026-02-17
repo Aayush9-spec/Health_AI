@@ -14,10 +14,11 @@ import {
     X,
     Bell
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
 import { getCurrentUserId, getUnreadCount, getProfile } from "@/lib/supabase-helpers";
+import { useRealtimeSubscription } from "@/lib/use-realtime";
 
 const sidebarItems = [
     { icon: <MessageSquare size={20} />, label: "Health Assistant", href: "/dashboard" },
@@ -36,15 +37,23 @@ export default function DashboardSidebar() {
     const [unread, setUnread] = useState(0);
     const [userName, setUserName] = useState("Patient");
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
+
+    const refreshUnread = useCallback(async () => {
+        if (!userId) return;
+        const count = await getUnreadCount(userId);
+        setUnread(count);
+    }, [userId]);
 
     useEffect(() => {
         const load = async () => {
-            const userId = await getCurrentUserId();
-            if (!userId) return;
+            const uid = await getCurrentUserId();
+            if (!uid) return;
+            setUserId(uid);
 
             const [count, profile] = await Promise.all([
-                getUnreadCount(userId),
-                getProfile(userId),
+                getUnreadCount(uid),
+                getProfile(uid),
             ]);
             setUnread(count);
             if (profile) {
@@ -53,18 +62,10 @@ export default function DashboardSidebar() {
             }
         };
         load();
-
-        // Poll unread count every 30s
-        const interval = setInterval(async () => {
-            const userId = await getCurrentUserId();
-            if (userId) {
-                const count = await getUnreadCount(userId);
-                setUnread(count);
-            }
-        }, 30000);
-
-        return () => clearInterval(interval);
     }, []);
+
+    // Real-time notification updates (instant badge)
+    useRealtimeSubscription("notifications", "user_id", userId, refreshUnread);
 
     const handleSignOut = async () => {
         const supabase = createClient();
