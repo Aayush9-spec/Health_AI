@@ -1,32 +1,93 @@
 "use client";
 
-import { Activity, Users, Calendar, DollarSign, ArrowUpRight, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Activity, Users, Calendar, FileText, ArrowUpRight, Clock, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
-
-const stats = [
-    { label: "Today's Appointments", value: "8", change: "+2", icon: <Calendar />, color: "text-blue-400", bg: "bg-blue-500/10" },
-    { label: "Total Patients", value: "1,248", change: "+12%", icon: <Users />, color: "text-purple-400", bg: "bg-purple-500/10" },
-    { label: "Pending Reports", value: "5", change: "-2", icon: <Activity />, color: "text-orange-400", bg: "bg-orange-500/10" },
-    { label: "Revenue (ETH)", value: "4.2", change: "+8%", icon: <DollarSign />, color: "text-green-400", bg: "bg-green-500/10" },
-];
-
-const urgentTasks = [
-    { id: 1, text: "Review blood reports for Patient #8821", time: "10 mins ago", priority: "High" },
-    { id: 2, text: "Approve prescription refill request", time: "1 hour ago", priority: "Medium" },
-    { id: 3, text: "Follow up with Michael Ross", time: "2 hours ago", priority: "Low" },
-];
+import { useState, useEffect } from "react";
+import { getCurrentUserId, getDoctorStats, getNextDoctorAppointment, getProfile, DoctorStats, DoctorAppointment } from "@/lib/supabase-helpers";
 
 export default function DoctorDashboard() {
+    const [stats, setStats] = useState<DoctorStats | null>(null);
+    const [nextApt, setNextApt] = useState<DoctorAppointment | null>(null);
+    const [doctorName, setDoctorName] = useState("");
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const load = async () => {
+            const userId = await getCurrentUserId();
+            if (!userId) { setLoading(false); return; }
+
+            const [statsData, nextData, profile] = await Promise.all([
+                getDoctorStats(userId),
+                getNextDoctorAppointment(userId),
+                getProfile(userId),
+            ]);
+
+            setStats(statsData);
+            setNextApt(nextData);
+            setDoctorName(profile?.full_name || "Doctor");
+            setLoading(false);
+        };
+        load();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <Loader2 className="animate-spin text-blue-500" size={32} />
+            </div>
+        );
+    }
+
+    const greeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "Good Morning";
+        if (hour < 17) return "Good Afternoon";
+        return "Good Evening";
+    };
+
+    const statCards = [
+        {
+            label: "Today's Appointments",
+            value: stats?.todayAppointments ?? 0,
+            icon: <Calendar />,
+            color: "text-blue-400",
+            bg: "bg-blue-500/10",
+        },
+        {
+            label: "Total Patients",
+            value: stats?.totalPatients ?? 0,
+            icon: <Users />,
+            color: "text-purple-400",
+            bg: "bg-purple-500/10",
+        },
+        {
+            label: "Pending Reports",
+            value: stats?.pendingReports ?? 0,
+            icon: <Activity />,
+            color: "text-orange-400",
+            bg: "bg-orange-500/10",
+        },
+        {
+            label: "Prescriptions Sent",
+            value: stats?.totalPrescriptions ?? 0,
+            icon: <FileText />,
+            color: "text-green-400",
+            bg: "bg-green-500/10",
+        },
+    ];
+
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-3xl font-bold mb-2">Good Morning, Dr. Chen</h1>
-                <p className="text-gray-400">Here's your daily practice overview</p>
+                <h1 className="text-3xl font-bold mb-2">
+                    {greeting()}, Dr. {doctorName.split(" ").pop()}
+                </h1>
+                <p className="text-gray-400">Here&apos;s your daily practice overview</p>
             </div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, index) => (
+                {statCards.map((stat, index) => (
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -38,9 +99,6 @@ export default function DoctorDashboard() {
                             <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
                                 {stat.icon}
                             </div>
-                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${stat.change.startsWith('+') ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                                {stat.change}
-                            </span>
                         </div>
                         <h3 className="text-2xl font-bold mb-1">{stat.value}</h3>
                         <p className="text-sm text-gray-500">{stat.label}</p>
@@ -49,27 +107,23 @@ export default function DoctorDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Urgent Tasks */}
+                {/* Quick Links */}
                 <div className="lg:col-span-2 bg-white/[0.02] border border-white/10 rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-semibold">Urgent Actions</h2>
-                        <button className="text-sm text-blue-400 hover:text-blue-300">View All</button>
-                    </div>
-                    <div className="space-y-4">
-                        {urgentTasks.map((task) => (
-                            <div key={task.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-colors">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-2 h-2 rounded-full ${task.priority === 'High' ? 'bg-red-500' : task.priority === 'Medium' ? 'bg-orange-500' : 'bg-blue-500'
-                                        }`} />
-                                    <div>
-                                        <h4 className="font-medium text-sm text-gray-200">{task.text}</h4>
-                                        <span className="text-xs text-gray-500">{task.time}</span>
-                                    </div>
-                                </div>
-                                <button className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
-                                    <ArrowUpRight size={18} />
-                                </button>
-                            </div>
+                    <h2 className="text-xl font-semibold mb-6">Quick Actions</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {[
+                            { label: "View Patients", href: "/doctor/patients", color: "text-purple-400 hover:border-purple-500/30" },
+                            { label: "Appointments", href: "/doctor/appointments", color: "text-blue-400 hover:border-blue-500/30" },
+                            { label: "Write Prescription", href: "/doctor/prescriptions", color: "text-green-400 hover:border-green-500/30" },
+                        ].map((link) => (
+                            <a
+                                key={link.label}
+                                href={link.href}
+                                className={`flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 ${link.color} transition-colors`}
+                            >
+                                <span className="font-medium text-sm">{link.label}</span>
+                                <ArrowUpRight size={18} />
+                            </a>
                         ))}
                     </div>
                 </div>
@@ -82,37 +136,52 @@ export default function DoctorDashboard() {
                         <Clock size={18} className="text-blue-400" /> Up Next
                     </h2>
 
-                    <div className="space-y-6 relative z-10">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-lg font-bold">
-                                MP
+                    {nextApt ? (
+                        <div className="space-y-6 relative z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-lg font-bold">
+                                    {(nextApt.patient?.full_name || "P").charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-lg">{nextApt.patient?.full_name || "Patient"}</h3>
+                                    <p className="text-blue-300 text-sm">{nextApt.type === "online" ? "Online Consultation" : "In-Person Visit"}</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="font-semibold text-lg">Michael P.</h3>
-                                <p className="text-blue-300 text-sm">Follow-up: Viral Fever</p>
+
+                            <div className="flex gap-3 text-sm">
+                                <div className="px-3 py-1.5 bg-black/30 rounded-lg text-gray-300 border border-white/5">
+                                    {nextApt.time}
+                                </div>
+                                <div className="px-3 py-1.5 bg-black/30 rounded-lg text-gray-300 border border-white/5">
+                                    {new Date(nextApt.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                </div>
+                            </div>
+
+                            <div className="w-full h-px bg-white/10" />
+
+                            <div className="flex gap-3">
+                                {nextApt.type === "online" && nextApt.meet_link && (
+                                    <a
+                                        href={nextApt.meet_link}
+                                        target="_blank"
+                                        className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors text-center"
+                                    >
+                                        Join Call
+                                    </a>
+                                )}
+                                <a
+                                    href="/doctor/appointments"
+                                    className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 text-sm font-medium transition-colors text-center flex-1"
+                                >
+                                    View All
+                                </a>
                             </div>
                         </div>
-
-                        <div className="flex gap-3 text-sm">
-                            <div className="px-3 py-1.5 bg-black/30 rounded-lg text-gray-300 border border-white/5">
-                                10:30 AM
-                            </div>
-                            <div className="px-3 py-1.5 bg-black/30 rounded-lg text-gray-300 border border-white/5">
-                                Online Call
-                            </div>
+                    ) : (
+                        <div className="text-center py-6">
+                            <p className="text-gray-500 text-sm">No upcoming appointments</p>
                         </div>
-
-                        <div className="w-full h-px bg-white/10" />
-
-                        <div className="flex gap-3">
-                            <button className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors">
-                                Join Call
-                            </button>
-                            <button className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 text-sm font-medium transition-colors">
-                                Details
-                            </button>
-                        </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>

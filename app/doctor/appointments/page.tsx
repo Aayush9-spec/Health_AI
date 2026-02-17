@@ -1,198 +1,174 @@
 "use client";
 
-import { Calendar, Clock, Video, MapPin, Check, X, User, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { Calendar, Clock, Video, MapPin, Check, X, User, ChevronRight, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getCurrentUserId, getDoctorAppointments, updateAppointmentStatus, DoctorAppointment } from "@/lib/supabase-helpers";
 
-const appointments = [
-    {
-        id: 1,
-        patient: "Michael P.",
-        age: 34,
-        reason: "Follow-up: Viral Fever",
-        time: "10:30 AM",
-        date: "Today",
-        type: "online",
-        status: "pending",
-    },
-    {
-        id: 2,
-        patient: "Sarah J.",
-        age: 28,
-        reason: "New: Persistent headache",
-        time: "11:15 AM",
-        date: "Today",
-        type: "offline",
-        status: "confirmed",
-    },
-    {
-        id: 3,
-        patient: "David L.",
-        age: 45,
-        reason: "Routine Checkup",
-        time: "02:00 PM",
-        date: "Today",
-        type: "online",
-        status: "pending",
-    },
-    {
-        id: 4,
-        patient: "Emma W.",
-        age: 31,
-        reason: "Lab Results Review",
-        time: "09:00 AM",
-        date: "Tomorrow",
-        type: "offline",
-        status: "confirmed",
-    },
-];
-
-type AppointmentStatus = "pending" | "confirmed" | "rejected";
+type AppointmentStatus = { [id: string]: "accepting" | "rejecting" };
 
 export default function DoctorAppointmentsPage() {
-    const [filter, setFilter] = useState<"all" | "today" | "upcoming">("all");
-    const [statuses, setStatuses] = useState<Record<number, AppointmentStatus>>(
-        Object.fromEntries(appointments.map((a) => [a.id, a.status as AppointmentStatus]))
-    );
+    const [appointments, setAppointments] = useState<DoctorAppointment[]>([]);
+    const [filter, setFilter] = useState<"all" | "upcoming" | "completed" | "cancelled">("all");
+    const [loading, setLoading] = useState(true);
+    const [actionStatus, setActionStatus] = useState<AppointmentStatus>({});
 
-    const handleAccept = (id: number) => {
-        setStatuses((prev) => ({ ...prev, [id]: "confirmed" }));
+    useEffect(() => {
+        loadAppointments();
+    }, [filter]);
+
+    const loadAppointments = async () => {
+        const userId = await getCurrentUserId();
+        if (!userId) { setLoading(false); return; }
+        setLoading(true);
+        const data = await getDoctorAppointments(
+            userId,
+            filter === "all" ? undefined : filter as "upcoming" | "completed" | "cancelled"
+        );
+        setAppointments(data);
+        setLoading(false);
     };
 
-    const handleReject = (id: number) => {
-        setStatuses((prev) => ({ ...prev, [id]: "rejected" }));
+    const handleAccept = async (id: string) => {
+        setActionStatus((prev) => ({ ...prev, [id]: "accepting" }));
+        await updateAppointmentStatus(id, "completed");
+        setActionStatus((prev) => { const n = { ...prev }; delete n[id]; return n; });
+        await loadAppointments();
     };
 
-    const filtered = appointments.filter((a) => {
-        if (filter === "today") return a.date === "Today";
-        if (filter === "upcoming") return a.date !== "Today";
-        return true;
-    });
+    const handleReject = async (id: string) => {
+        setActionStatus((prev) => ({ ...prev, [id]: "rejecting" }));
+        await updateAppointmentStatus(id, "cancelled");
+        setActionStatus((prev) => { const n = { ...prev }; delete n[id]; return n; });
+        await loadAppointments();
+    };
+
+    const getStatusBadge = (status: string) => {
+        switch (status) {
+            case "upcoming": return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+            case "completed": return "bg-green-500/10 text-green-400 border-green-500/20";
+            case "cancelled": return "bg-red-500/10 text-red-400 border-red-500/20";
+            case "rescheduled": return "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+            default: return "bg-gray-500/10 text-gray-400 border-gray-500/20";
+        }
+    };
+
+    const filters = [
+        { key: "all", label: "All" },
+        { key: "upcoming", label: "Upcoming" },
+        { key: "completed", label: "Completed" },
+        { key: "cancelled", label: "Cancelled" },
+    ];
 
     return (
         <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold mb-1">Appointment Queue</h1>
-                    <p className="text-gray-400 text-sm">Manage incoming and confirmed appointments</p>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-500">
-                        {appointments.filter((a) => statuses[a.id] === "pending").length} pending
-                    </span>
-                    <span className="text-gray-700">•</span>
-                    <span className="text-green-400">
-                        {appointments.filter((a) => statuses[a.id] === "confirmed").length} confirmed
-                    </span>
-                </div>
+            <div>
+                <h1 className="text-2xl font-bold mb-1">Appointments</h1>
+                <p className="text-gray-400 text-sm">Manage your patient appointments</p>
             </div>
 
             {/* Filters */}
-            <div className="flex gap-2">
-                {(["all", "today", "upcoming"] as const).map((f) => (
+            <div className="flex gap-2 flex-wrap">
+                {filters.map((f) => (
                     <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${filter === f
-                                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                                : "bg-white/5 text-gray-400 border border-transparent hover:bg-white/10"
+                        key={f.key}
+                        onClick={() => setFilter(f.key as typeof filter)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${filter === f.key
+                                ? "bg-blue-600/20 border-blue-500/30 text-blue-400"
+                                : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10"
                             }`}
                     >
-                        {f}
+                        {f.label}
                     </button>
                 ))}
             </div>
 
-            {/* Appointment Cards */}
-            <div className="space-y-4">
-                <AnimatePresence>
-                    {filtered.map((appt, i) => {
-                        const status = statuses[appt.id];
+            {/* Appointments List */}
+            {loading ? (
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="animate-spin text-blue-500" size={32} />
+                </div>
+            ) : appointments.length === 0 ? (
+                <div className="text-center py-20 text-gray-500">
+                    <Calendar size={48} className="mx-auto mb-4 opacity-30" />
+                    <p className="text-lg font-medium">No appointments found</p>
+                    <p className="text-sm mt-1">Appointments booked by patients will appear here</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {appointments.map((apt, i) => {
+                        const patientName = (apt.patient as any)?.full_name || (apt.patient as any)?.email || "Patient";
+                        const initials = patientName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+
                         return (
                             <motion.div
-                                key={appt.id}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
                                 transition={{ delay: i * 0.05 }}
-                                className={`p-5 bg-white/[0.02] border rounded-xl transition-all ${status === "rejected"
-                                        ? "border-red-500/20 opacity-50"
-                                        : status === "confirmed"
-                                            ? "border-green-500/20"
-                                            : "border-white/10"
-                                    }`}
+                                key={apt.id}
+                                className="p-5 bg-white/[0.02] border border-white/10 rounded-2xl hover:bg-white/[0.04] transition-colors"
                             >
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    {/* Patient Info */}
+                                <div className="flex items-start justify-between">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-lg font-bold">
-                                            {appt.patient
-                                                .split(" ")
-                                                .map((n) => n[0])
-                                                .join("")}
+                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600/30 to-purple-600/30 flex items-center justify-center text-sm font-bold border border-white/10">
+                                            {initials}
                                         </div>
                                         <div>
-                                            <div className="flex items-center gap-3">
-                                                <h3 className="font-semibold">{appt.patient}</h3>
-                                                <span className="text-xs text-gray-500">{appt.age}y</span>
-                                                {appt.type === "online" && (
-                                                    <span className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20 uppercase font-medium">
-                                                        Video
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="text-sm text-gray-400">{appt.reason}</p>
-                                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                                            <h3 className="font-semibold text-gray-200">{patientName}</h3>
+                                            <div className="flex items-center gap-3 text-xs text-gray-500 mt-1.5">
                                                 <span className="flex items-center gap-1">
-                                                    <Calendar size={10} /> {appt.date}
+                                                    <Calendar size={12} />
+                                                    {new Date(apt.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                                 </span>
                                                 <span className="flex items-center gap-1">
-                                                    <Clock size={10} /> {appt.time}
+                                                    <Clock size={12} /> {apt.time}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    {apt.type === "online" ? <Video size={12} /> : <MapPin size={12} />}
+                                                    {apt.type === "online" ? "Online" : "In-Person"}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Actions */}
                                     <div className="flex items-center gap-3">
-                                        {status === "pending" ? (
-                                            <>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadge(apt.status)}`}>
+                                            {apt.status}
+                                        </span>
+
+                                        {apt.status === "upcoming" && (
+                                            <div className="flex gap-2">
                                                 <button
-                                                    onClick={() => handleAccept(appt.id)}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                                    onClick={() => handleAccept(apt.id)}
+                                                    disabled={!!actionStatus[apt.id]}
+                                                    className="p-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded-lg transition-colors disabled:opacity-50"
+                                                    title="Complete"
                                                 >
-                                                    <Check size={14} /> Accept
+                                                    {actionStatus[apt.id] === "accepting" ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                                                 </button>
                                                 <button
-                                                    onClick={() => handleReject(appt.id)}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg text-sm font-medium transition-colors border border-white/10"
+                                                    onClick={() => handleReject(apt.id)}
+                                                    disabled={!!actionStatus[apt.id]}
+                                                    className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors disabled:opacity-50"
+                                                    title="Cancel"
                                                 >
-                                                    <X size={14} /> Decline
+                                                    {actionStatus[apt.id] === "rejecting" ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
                                                 </button>
-                                            </>
-                                        ) : status === "confirmed" ? (
-                                            <div className="flex items-center gap-3">
-                                                {appt.type === "online" && (
-                                                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
-                                                        <Video size={14} /> Start Call
-                                                    </button>
-                                                )}
-                                                <span className="flex items-center gap-1 text-green-400 text-xs font-medium bg-green-500/10 px-3 py-1.5 rounded-full border border-green-500/20">
-                                                    <Check size={12} /> Confirmed
-                                                </span>
                                             </div>
-                                        ) : (
-                                            <span className="text-red-400 text-xs font-medium bg-red-500/10 px-3 py-1.5 rounded-full border border-red-500/20">
-                                                Declined
-                                            </span>
                                         )}
                                     </div>
                                 </div>
+
+                                {apt.notes && (
+                                    <div className="mt-3 pt-3 border-t border-white/5">
+                                        <p className="text-xs text-gray-500"><span className="text-gray-400">Notes:</span> {apt.notes}</p>
+                                    </div>
+                                )}
                             </motion.div>
                         );
                     })}
-                </AnimatePresence>
-            </div>
+                </div>
+            )}
         </div>
     );
 }
