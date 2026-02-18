@@ -1,7 +1,18 @@
 "use client";
 
 import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import { Truck, MapPin, Package, Clock, ShieldCheck, Phone } from "lucide-react";
+
+// Dynamically import map to avoid SSR issues with Leaflet
+const DeliveryMap = dynamic(() => import("@/components/DeliveryMap"), {
+    ssr: false,
+    loading: () => (
+        <div className="w-full h-[500px] flex items-center justify-center bg-white/5 rounded-2xl animate-pulse">
+            <p className="text-gray-400">Loading Map...</p>
+        </div>
+    ),
+});
 
 export default function DeliveryDashboard() {
     return (
@@ -47,21 +58,9 @@ export default function DeliveryDashboard() {
 
             {/* Map & Tasks Split */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Simulated Map Area */}
-                <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden min-h-[400px] relative">
-                    <div className="absolute inset-0 bg-[#111] flex items-center justify-center">
-                        <div className="text-center">
-                            <MapPin size={48} className="mx-auto text-orange-500 mb-4 animate-bounce" />
-                            <p className="text-gray-500">Live Map Integration</p>
-                            <p className="text-xs text-gray-600">(Google Maps / Mapbox placeholder)</p>
-                        </div>
-                    </div>
-                    {/* Overlay Controls */}
-                    <div className="absolute bottom-6 right-6 flex gap-2">
-                        <button className="p-3 bg-white text-black rounded-full shadow-lg font-bold hover:bg-gray-200 transition-colors">
-                            Accept New Order
-                        </button>
-                    </div>
+                {/* Real interactive Map */}
+                <div className="lg:col-span-2">
+                    <DeliveryMap />
                 </div>
 
                 {/* Task List */}
