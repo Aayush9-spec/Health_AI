@@ -4,7 +4,7 @@
 
 ![MedAI Dashboard Preview](https://via.placeholder.com/1200x600?text=MedAI+Dashboard+Preview)
 
-## 🚀 Key Features
+## 🚀 Key Features 
 
 ### 1. **AI Health Assistant (The Brain)** 
    *   **Real-time Diagnosis**: Uses **OpenAI GPT-4o** to analyze symptoms and provide preliminary medical advice with disclaimers.
