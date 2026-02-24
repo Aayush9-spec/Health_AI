@@ -69,7 +69,7 @@
     NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
     ```
 
-4.  **Run the Development Server**
+4.  **Run the Development Server** 
     ```bash
     npm run dev
     ```
