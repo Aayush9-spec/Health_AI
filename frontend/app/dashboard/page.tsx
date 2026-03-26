@@ -66,29 +66,34 @@ export default function DashboardHome() {
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })) }),
+                body: JSON.stringify({
+                    messages: [...messages, userMsg].map((m) => ({
+                        role: m.role === "ai" ? "assistant" : m.role,
+                        content: m.content,
+                    })),
+                }),
             });
 
             if (!response.ok) throw new Error("Network response was not ok");
 
             const data = await response.json();
+            const aiContent = typeof data?.content === "string" ? data.content : "";
 
-            // Step 2: Handle API Key Missing / Fallback gracefully
-            if (data.content && data.content.includes("medical-intelligence-node-missing")) {
-                // Fallback to local simulation if no key (so the demo still works)
+            // Step 2: Handle malformed response gracefully
+            if (!aiContent) {
                 runLocalSimulation(text);
             } else {
                 // Real AI Response
                 // Check for appointment intent in real response (basic keyword check on AI output)
                 let action = undefined;
-                const lowerContent = data.content.toLowerCase();
+                const lowerContent = aiContent.toLowerCase();
                 if (lowerContent.includes("book") || lowerContent.includes("schedule")) {
                     action = "confirm_booking";
                 } else if (lowerContent.includes("consult") || lowerContent.includes("doctor") || lowerContent.includes("specialist")) {
                     action = "book_appointment";
                 }
 
-                setMessages((prev) => [...prev, { role: "ai", content: data.content, action }]);
+                setMessages((prev) => [...prev, { role: "ai", content: aiContent, action }]);
                 setIsProcessing(false);
             }
 
@@ -107,7 +112,7 @@ export default function DashboardHome() {
             if (lowerText.includes("fever") || lowerText.includes("headache") || lowerText.includes("cold")) {
                 aiResponse = {
                     role: "ai",
-                    content: "Simulated: I've analyzed your symptoms. It indicates a potential viral infection. \n\n(Add OPENAI_API_KEY to .env.local for Real AI Analysis)",
+                    content: "Simulated: I've analyzed your symptoms. It indicates a potential viral infection. \n\n(Add OPENROUTER_API_KEY or GROQ_API_KEY in frontend/.env.local for live AI analysis.)",
                     action: "book_appointment",
                 };
             } else if (lowerText.includes("book") || lowerText.includes("appointment")) {

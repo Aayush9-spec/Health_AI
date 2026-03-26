@@ -73,8 +73,11 @@ health-ai/
 3.  **Configure Environment**
     Create a `.env.local` file in `frontend/`:
     ```bash
-    # AI Brain
-    OPENAI_API_KEY=sk-your-openai-key
+    # AI Brain (recommended)
+    OPENROUTER_API_KEY=your-openrouter-key
+    GROQ_API_KEY=your-groq-key
+    # Optional fallback
+    OPENAI_API_KEY=your-openai-key
 
     # Auth & Database
     NEXT_PUBLIC_SUPABASE_URL=your-supabase-url

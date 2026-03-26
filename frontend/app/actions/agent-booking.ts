@@ -1,10 +1,6 @@
 "use server";
 
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+import { getAiRuntime, parseJsonObject } from "@/lib/server-ai";
 
 export interface AgentResponse {
     reply: string;
@@ -16,89 +12,128 @@ export interface AgentResponse {
     } | null;
 }
 
+function fallbackResponse(userText: string): AgentResponse {
+    const lowerText = userText.toLowerCase();
+
+    if (lowerText.includes("headache") || lowerText.includes("fever")) {
+        return {
+            reply:
+                "I understand you’re not feeling well. Based on these symptoms, a General Physician consult would be appropriate. I can prepare a booking now.",
+            booking_intent: {
+                specialization: "General Physician",
+                doctor_name: "Available Doctor",
+                date: "Today",
+                time: "04:30 PM",
+            },
+        };
+    }
+
+    if (lowerText.includes("chest") || lowerText.includes("heart")) {
+        return {
+            reply:
+                "Chest-related symptoms can be serious. Please seek urgent care. I can also prepare a cardiology appointment immediately.",
+            booking_intent: {
+                specialization: "Cardiologist",
+                doctor_name: "Available Cardiologist",
+                date: "Today",
+                time: "Immediate",
+            },
+        };
+    }
+
+    return {
+        reply:
+            "Please describe your symptoms in detail, including duration and severity, and I will suggest the right specialist.",
+        booking_intent: null,
+    };
+}
+
+function normalizeAgentResponse(parsed: unknown, rawText: string): AgentResponse {
+    const data = (parsed || {}) as {
+        reply?: unknown;
+        booking_intent?: {
+            specialization?: unknown;
+            doctor_name?: unknown;
+            date?: unknown;
+            time?: unknown;
+        } | null;
+    };
+
+    const reply = String(data.reply || "").trim() || rawText || "I can help with symptom triage and booking.";
+    const booking = data.booking_intent;
+
+    if (!booking) {
+        return { reply, booking_intent: null };
+    }
+
+    const specialization = String(booking.specialization || "").trim();
+    const doctorName = String(booking.doctor_name || "").trim();
+    const date = String(booking.date || "").trim();
+    const time = String(booking.time || "").trim();
+
+    if (!specialization || !date || !time) {
+        return { reply, booking_intent: null };
+    }
+
+    return {
+        reply,
+        booking_intent: {
+            specialization,
+            doctor_name: doctorName || "Available Doctor",
+            date,
+            time,
+        },
+    };
+}
+
 export async function processAgentRequest(userText: string): Promise<{ result?: AgentResponse; error?: string }> {
-    if (!userText) {
+    if (!userText?.trim()) {
         return { error: "No text provided" };
     }
 
+    const runtime = getAiRuntime("chat");
+
+    if (!runtime) {
+        return { result: fallbackResponse(userText) };
+    }
+
     try {
-        // Mock response if API key is missing (for testing)
-        if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "your-api-key-here") {
-            console.log("Using Mock AI Agent Response");
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-
-            const lowerText = userText.toLowerCase();
-            let mockResponse: AgentResponse;
-
-            if (lowerText.includes("headache") || lowerText.includes("fever")) {
-                mockResponse = {
-                    reply: "I understand you're not feeling well. For headaches and fever, I recommend seeing a General Physician. Dr. Sarah Johnson is available today at 4:30 PM. Would you like to book an appointment?",
-                    booking_intent: {
-                        specialization: "General Physician",
-                        doctor_name: "Dr. Sarah Johnson",
-                        date: "Today",
-                        time: "04:30 PM"
-                    }
-                };
-            } else if (lowerText.includes("heart") || lowerText.includes("chest")) {
-                mockResponse = {
-                    reply: "Chest pain can be serious. I strongly recommend a Cardiologist. Dr. Emily Chen has an emergency slot available immediately. Shall I guide you to emergency services or book the slot?",
-                    booking_intent: {
-                        specialization: "Cardiologist",
-                        doctor_name: "Dr. Emily Chen",
-                        date: "Today",
-                        time: "Immediate"
-                    }
-                };
-            } else {
-                mockResponse = {
-                    reply: "I'm listening. Could you describe your symptoms more clearly? For example, tell me if you have pain, fever, or other issues.",
-                    booking_intent: null
-                };
-            }
-            return { result: mockResponse };
-        }
-
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o",
+        const response = await runtime.client.chat.completions.create({
+            model: runtime.model,
+            temperature: 0.4,
+            max_tokens: 350,
             messages: [
                 {
                     role: "system",
-                    content: `You are an empathetic medical AI booking assistant. Your goal is to:
-                    1. Listen to the patient's symptoms.
-                    2. Determine the appropriate medical specialization.
-                    3. Suggest a fictitious but realistic doctor and an availability time (usually today or tomorrow).
-                    4. output a JSON response.
-
-                    JSON Format:
-                    {
-                        "reply": "Conversational response to the user, empathetic and suggesting the doctor.",
-                        "booking_intent": {
-                            "specialization": "Specialization Name",
-                            "doctor_name": "Doctor Name",
-                            "date": "Date string (e.g. Today, Tomorrow, or YYYY-MM-DD)",
-                            "time": "Time string (e.g. 10:00 AM)"
-                        } 
-                    }
-                    
-                    If the user input is not related to symptoms or booking, set "booking_intent" to null and just reply conversationally.`
+                    content: `You are MedAI voice triage assistant.
+Return ONLY valid JSON:
+{
+  "reply": "empathetic clinical guidance in 1-3 sentences",
+  "booking_intent": {
+    "specialization": "recommended specialization",
+    "doctor_name": "preferred doctor name or Available Doctor",
+    "date": "Today | Tomorrow | YYYY-MM-DD",
+    "time": "hh:mm AM/PM | Immediate"
+  } | null
+}
+Rules:
+- Set booking_intent to null if booking is not appropriate yet.
+- For severe/emergency symptoms, advise urgent care first.`,
                 },
                 {
                     role: "user",
-                    content: userText
-                }
+                    content: userText,
+                },
             ],
-            response_format: { type: "json_object" },
-            max_tokens: 300,
         });
 
-        const content = response.choices[0].message.content;
-        if (!content) throw new Error("No response from AI");
-
-        return { result: JSON.parse(content) };
-
-    } catch (error: any) {
-        console.error("Agent Logic Error:", error);
-        return { error: error.message || "Failed to process request" };
+        const raw = response.choices[0]?.message?.content || "";
+        const parsed = parseJsonObject(raw);
+        return { result: normalizeAgentResponse(parsed, raw) };
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Failed to process request";
+        console.error("Agent Logic Error:", message);
+        return { error: message };
     }
 }
+

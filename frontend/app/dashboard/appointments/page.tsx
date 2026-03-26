@@ -29,6 +29,7 @@ export default function AppointmentsPage() {
     const [bookingTime, setBookingTime] = useState("");
     const [loading, setLoading] = useState(true);
     const [booking, setBooking] = useState(false);
+    const [bookingError, setBookingError] = useState<string | null>(null);
     const [cancelling, setCancelling] = useState<string | null>(null);
     const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
@@ -108,9 +109,11 @@ export default function AppointmentsPage() {
     const handleBook = async () => {
         if (!selectedDoctor || !bookingDate || !bookingTime) return;
 
+        setBookingError(null);
         setBooking(true);
         const userId = await getCurrentUserId();
         if (!userId) {
+            setBookingError("Please sign in again before booking.");
             setBooking(false);
             return;
         }
@@ -132,7 +135,7 @@ export default function AppointmentsPage() {
                 });
                 const order = await res.json();
 
-                if (!order.id) throw new Error("Order creation failed");
+                if (!order.id) throw new Error(order.error || "Order creation failed");
 
                 const options = {
                     key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_placeholder", 
@@ -167,8 +170,8 @@ export default function AppointmentsPage() {
                 setBooking(false); // Modal stays open until payment completes
             } catch (err) {
                 console.error("Payment failed", err);
+                setBookingError("Payment initiation failed. Please try again.");
                 setBooking(false);
-                alert("Payment initiation failed. Please try again.");
             }
         } else {
             // Free consultation or offline
@@ -205,6 +208,8 @@ export default function AppointmentsPage() {
                 setBookingDate("");
                 setBookingTime("");
             }, 2000);
+        } else {
+            setBookingError("Unable to complete booking. Please try another slot.");
         }
     };
 
@@ -233,7 +238,10 @@ export default function AppointmentsPage() {
                     onLoad={() => setRazorpayLoaded(true)}
                 />
                 <button
-                    onClick={() => setShowBooking(true)}
+                    onClick={() => {
+                        setBookingError(null);
+                        setShowBooking(true);
+                    }}
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 self-start sm:self-auto"
                 >
                     <Plus size={16} /> New Booking
@@ -273,6 +281,11 @@ export default function AppointmentsPage() {
                                     </div>
 
                                     <div className="space-y-4">
+                                        {bookingError && (
+                                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-300">
+                                                {bookingError}
+                                            </div>
+                                        )}
                                         <div className="space-y-2">
                                             <label className="text-sm text-gray-400">Select Doctor</label>
                                             <div className="space-y-2 max-h-[200px] overflow-y-auto">
@@ -301,6 +314,11 @@ export default function AppointmentsPage() {
                                                         )}
                                                     </button>
                                                 ))}
+                                                {doctors.length === 0 && (
+                                                    <div className="text-xs text-yellow-300 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                                                        No doctor profiles are available yet. Add doctors in your database to enable bookings.
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -310,6 +328,7 @@ export default function AppointmentsPage() {
                                                 type="date"
                                                 value={bookingDate}
                                                 onChange={(e) => setBookingDate(e.target.value)}
+                                                min={new Date().toISOString().split("T")[0]}
                                                 className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500/50 [color-scheme:dark]"
                                             />
                                         </div>

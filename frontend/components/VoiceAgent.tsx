@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Mic, MicOff, Volume2, User, Bot, Calendar, Clock, Stethoscope } from "lucide-react";
+import { Mic, MicOff, User, Bot, Calendar, Clock, Stethoscope, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { processAgentRequest, AgentResponse } from "@/app/actions/agent-booking";
+import { bookAppointment, getCurrentUserId, getDoctors } from "@/lib/supabase-helpers";
 
 // Type definition for Web Speech API
 interface IWindow extends Window {
@@ -16,8 +17,67 @@ export default function VoiceAgent() {
     const [transcript, setTranscript] = useState("");
     const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai', text: string }[]>([]);
     const [loading, setLoading] = useState(false);
+    const [bookingSubmitting, setBookingSubmitting] = useState(false);
+    const [bookingError, setBookingError] = useState<string | null>(null);
     const [bookingProposal, setBookingProposal] = useState<AgentResponse['booking_intent']>(null);
     const recognitionRef = useRef<any>(null);
+
+    const resolveBookingDate = (rawDate: string) => {
+        const value = rawDate.trim().toLowerCase();
+        const now = new Date();
+
+        if (!value || value.includes("today")) {
+            return now.toISOString().slice(0, 10);
+        }
+
+        if (value.includes("tomorrow")) {
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return tomorrow.toISOString().slice(0, 10);
+        }
+
+        const isoMatch = rawDate.match(/\d{4}-\d{2}-\d{2}/);
+        if (isoMatch) return isoMatch[0];
+
+        const parsed = new Date(rawDate);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toISOString().slice(0, 10);
+        }
+
+        return now.toISOString().slice(0, 10);
+    };
+
+    const resolveBookingTime = (rawTime: string) => {
+        const value = rawTime.trim().toLowerCase();
+        const now = new Date();
+
+        if (!value || value === "immediate" || value === "now") {
+            const rounded = new Date(now);
+            rounded.setMinutes(Math.ceil(rounded.getMinutes() / 15) * 15, 0, 0);
+            return rounded.toTimeString().slice(0, 5);
+        }
+
+        const amPmMatch = rawTime.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+        if (amPmMatch) {
+            let hour = Number(amPmMatch[1]);
+            const minute = Number(amPmMatch[2]);
+            const part = amPmMatch[3].toLowerCase();
+
+            if (part === "pm" && hour < 12) hour += 12;
+            if (part === "am" && hour === 12) hour = 0;
+
+            return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+        }
+
+        const twentyFourMatch = rawTime.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+        if (twentyFourMatch) {
+            const hour = String(twentyFourMatch[1]).padStart(2, "0");
+            const minute = twentyFourMatch[2];
+            return `${hour}:${minute}`;
+        }
+
+        return "10:00";
+    };
 
     useEffect(() => {
         // Initialize Speech Recognition
@@ -66,6 +126,7 @@ export default function VoiceAgent() {
 
     const handleStartListening = () => {
         setBookingProposal(null);
+        setBookingError(null);
         setTranscript("");
         if (recognitionRef.current) {
             try {
@@ -89,6 +150,7 @@ export default function VoiceAgent() {
     const processInput = async (text: string) => {
         if (!text.trim()) return;
 
+        setBookingError(null);
         setChatHistory(prev => [...prev, { role: 'user', text }]);
         setLoading(true);
 
@@ -114,12 +176,61 @@ export default function VoiceAgent() {
         }
     };
 
-    const confirmBooking = () => {
-        const confirmMsg = `Great! I've booked your appointment with ${bookingProposal?.doctor_name} for ${bookingProposal?.time}.`;
-        setChatHistory(prev => [...prev, { role: 'ai', text: confirmMsg }]);
-        speak(confirmMsg);
-        setBookingProposal(null);
-        // Here you would call an actual booking API
+    const confirmBooking = async () => {
+        if (!bookingProposal) return;
+
+        setBookingSubmitting(true);
+        setBookingError(null);
+
+        try {
+            const userId = await getCurrentUserId();
+            if (!userId) {
+                throw new Error("Please sign in again before booking.");
+            }
+
+            const doctors = await getDoctors();
+            if (!doctors.length) {
+                throw new Error("No doctors are available right now. Please try again shortly.");
+            }
+
+            const targetName = bookingProposal.doctor_name.toLowerCase().trim();
+            const targetSpecialization = bookingProposal.specialization.toLowerCase().trim();
+
+            const doctor =
+                doctors.find((d) => d.name.toLowerCase() === targetName) ||
+                doctors.find((d) => targetName && d.name.toLowerCase().includes(targetName)) ||
+                doctors.find((d) => targetSpecialization && d.specialty.toLowerCase().includes(targetSpecialization)) ||
+                doctors[0];
+
+            const date = resolveBookingDate(bookingProposal.date);
+            const time = resolveBookingTime(bookingProposal.time);
+
+            const success = await bookAppointment({
+                patient_id: userId,
+                doctor_id: doctor.id,
+                date,
+                time,
+                type: doctor.meet_link ? "online" : "offline",
+                meet_link: doctor.meet_link || undefined,
+                payment_status: "pending",
+                amount: doctor.consultation_fee || 0,
+            });
+
+            if (!success) {
+                throw new Error("Booking could not be completed. Please try again.");
+            }
+
+            const confirmMsg = `Booked. Your appointment with ${doctor.name} is scheduled for ${date} at ${time}.`;
+            setChatHistory((prev) => [...prev, { role: "ai", text: confirmMsg }]);
+            speak(confirmMsg);
+            setBookingProposal(null);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Booking failed.";
+            setBookingError(message);
+            setChatHistory((prev) => [...prev, { role: "ai", text: message }]);
+        } finally {
+            setBookingSubmitting(false);
+        }
     };
 
     return (
@@ -202,18 +313,25 @@ export default function VoiceAgent() {
                                 </div>
                             </div>
                         </div>
+                        {bookingError && (
+                            <div className="mb-3 text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl p-2.5">
+                                {bookingError}
+                            </div>
+                        )}
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setBookingProposal(null)}
+                                disabled={bookingSubmitting}
                                 className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-sm font-medium transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={confirmBooking}
-                                className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-sm font-bold shadow-lg shadow-teal-900/20 transition-all transform hover:scale-[1.02]"
+                                disabled={bookingSubmitting}
+                                className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-bold shadow-lg shadow-teal-900/20 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2"
                             >
-                                Confirm Booking
+                                {bookingSubmitting ? <><Loader2 size={15} className="animate-spin" /> Booking...</> : "Confirm Booking"}
                             </button>
                         </div>
                     </motion.div>
