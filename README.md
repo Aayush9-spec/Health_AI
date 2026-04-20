@@ -16,7 +16,7 @@
    *   **Provider Portal**: Dedicated interface for doctors to manage patients, join video calls, and digitally sign prescriptions.
    *   **Video Consultations**: Integrated Google Meet links for seamless telehealth sessions.
 
-### 3. **Web3 & Payments (The Chain)**
+### 3. **Web3 & Payments (The Chain)** 
    *   **Smart Wallet**: Built-in crypto wallet support (via **RainbowKit** & **Wagmi**).
    *   **Secure Transactions**: Pay for consultations and prescriptions using ETH/USDC (Simulated on Testnet).
    *   **Transparency**: Immutable record of medical transactions.
