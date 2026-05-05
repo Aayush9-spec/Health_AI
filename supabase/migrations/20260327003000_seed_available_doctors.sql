@@ -1,6 +1,6 @@
 -- Ensure default available doctors exist for appointment booking.
 -- Mirrors supabase/seed.sql and is idempotent.
-
+ 
 insert into public.doctors (
     id,
     user_id,
