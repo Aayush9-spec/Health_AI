@@ -55,7 +55,7 @@ health-ai/
 *   Node.js 18+
 *   OpenAI API Key
 *   Supabase Project (URL & Anon Key)
-
+ 
 ### Installation
 
 1.  **Clone the repository**
