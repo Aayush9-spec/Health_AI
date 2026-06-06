@@ -1,3 +1,4 @@
+![Uploading Screenshot 2026-06-06 at 1.32.19 PM.png…]()
 # 🧠 NIRVAAAN: Decentralized Medical Intelligence Protocol
 
 **NIRVAAAN** is an AI-powered healthcare platform that bridges the gap between patient care, artificial intelligence, and decentralized finance. It provides real-time symptom analysis, connects patients with doctors, and facilitates secure, transparent payments via blockchain technology.
